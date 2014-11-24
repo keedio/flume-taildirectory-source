@@ -4,7 +4,7 @@
 
   <groupId>org.apache.flume.sources-taildirectory</groupId>
   <artifactId>flume-taildirectory-source</artifactId>
-  <version>0.0.1</version>
+  <version>1.4.0</version>
   <packaging>jar</packaging>
 
   <name>flume-taildirectory-source</name>
@@ -20,11 +20,8 @@
     	<version>1.4.0</version>
     </dependency>
   </dependencies>
-
   <build>
-
   <plugins>
-        
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>

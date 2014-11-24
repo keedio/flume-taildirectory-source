@@ -36,17 +36,10 @@ public class DirectoryTailSource extends AbstractSource implements
 	
   private static final String CONFIG_DIRS = "dirs";
   private static final String CONFIG_PATH = "path";
-  private static final String THREAD_NUMBER = "parallel-tasks";
-
-  private static final int DEFAULT_THREAD_NUMBER = 10;
-  
-  
+    
   private static final Logger logger = LoggerFactory.getLogger(DirectoryTailSource.class);
-
   private SourceCounter sourceCounter;
-
   private String confDirs;
-
   
   public void configure(Context context) {
     logger.info("Source Configuring..");

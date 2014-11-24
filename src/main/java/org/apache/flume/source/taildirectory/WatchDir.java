@@ -26,7 +26,6 @@ public class WatchDir {
  
     private final WatchService watcher;
     private final Map<WatchKey,Path> keys;
-    //private static Hashtable<String, FileSet> fileSetMap;
     private AbstractSource source;
     private Hashtable<String, FileSet> fileSetMap;
     
