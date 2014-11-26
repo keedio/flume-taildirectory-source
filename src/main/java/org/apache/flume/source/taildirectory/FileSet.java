@@ -22,6 +22,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -40,24 +41,56 @@ public class FileSet {
   private List<String> bufferList;
   private Map<String, String> headers;
   private long lastAppendTime;
-  private String filePath;
+  private Path filePath;
   
-  public FileSet(String filePath,boolean fromBeginning) throws IOException {
+  public FileSet(Path filePath, boolean readLastLine) throws IOException {
       
 	  this.bufferList = new ArrayList<String>();
 	  this.lastAppendTime = System.currentTimeMillis(); 
 	  this.filePath = filePath;
 
-	  File f = new File(filePath);
+	  File f = new File(filePath.toString());
 
 	  rReader = new RandomAccessFile(f, "r");
-	  if (fromBeginning)
-		  rReader.seek(0);
-	  else
+	  if (readLastLine){
+		  seekToLastLine(rReader);
+	  }
+	  else{ 
 		  rReader.seek(f.length());
+	  }
+	  
+	  logger.debug("File length --> " + f.length());
+	  logger.debug("File pointer --> " + rReader.getFilePointer());
 
 	  headers = new HashMap<String, String>();
 	  logger.debug("FileSet has been created " + filePath);
+  }
+  
+  
+
+  // This method is use to avoid lost last line log
+  private void seekToLastLine(RandomAccessFile rReader) throws IOException {
+	  
+	  long fileLength = rReader.length() -1 ;
+	  long filePointer = fileLength;
+	  boolean posReached = false;
+	  int readByte = 0;
+	  
+	  while (filePointer != -1 && !posReached){
+		  rReader.seek( filePointer );
+		  readByte = rReader.readByte();
+		  if( readByte == 0xA ) {
+			  if( filePointer != fileLength ){
+                  posReached = true;
+			  }
+		  } else if( readByte == 0xD ) {
+              if( filePointer != fileLength - 1 ){
+            	  posReached = true;
+              }
+          }
+              
+          filePointer--;
+	  }
   }
 
   public String readLine() throws IOException {
@@ -141,7 +174,7 @@ public class FileSet {
 	  rReader.close();
   }
   
-  public String getFilePath(){
+  public Path getFilePath(){
 	  return filePath;
   }
 }
