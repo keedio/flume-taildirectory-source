@@ -40,16 +40,21 @@ public class FileSet {
   private List<String> bufferList;
   private Map<String, String> headers;
   private long lastAppendTime;
+  private String filePath;
   
-  public FileSet(String filePath) throws IOException {
+  public FileSet(String filePath,boolean fromBeginning) throws IOException {
       
 	  this.bufferList = new ArrayList<String>();
 	  this.lastAppendTime = System.currentTimeMillis(); 
+	  this.filePath = filePath;
 
 	  File f = new File(filePath);
 
 	  rReader = new RandomAccessFile(f, "r");
-	  rReader.seek(0);
+	  if (fromBeginning)
+		  rReader.seek(0);
+	  else
+		  rReader.seek(f.length());
 
 	  headers = new HashMap<String, String>();
 	  logger.debug("FileSet has been created " + filePath);
@@ -130,5 +135,13 @@ public class FileSet {
 
   public void setBufferedReader(BufferedReader bufferedReader) {
     this.bufferedReader = bufferedReader;
+  }
+
+  public void close() throws IOException {
+	  rReader.close();
+  }
+  
+  public String getFilePath(){
+	  return filePath;
   }
 }

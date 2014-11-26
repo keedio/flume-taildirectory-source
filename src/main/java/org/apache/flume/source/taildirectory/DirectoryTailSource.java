@@ -19,7 +19,9 @@
 package org.apache.flume.source.taildirectory;
 
 import java.io.IOException;
-import java.nio.file.Paths;
+import java.nio.file.FileSystems;
+import java.util.HashSet;
+import java.util.Set;
 
 import org.apache.flume.Context;
 import org.apache.flume.EventDrivenSource;
@@ -40,47 +42,62 @@ public class DirectoryTailSource extends AbstractSource implements
   private static final Logger logger = LoggerFactory.getLogger(DirectoryTailSource.class);
   private SourceCounter sourceCounter;
   private String confDirs;
+  private Set<String> dirs;
+  private Set<WatchDir> watchDirs;
   
   public void configure(Context context) {
     logger.info("Source Configuring..");
 
     confDirs = context.getString(CONFIG_DIRS).trim();
     Preconditions.checkState(confDirs != null, "Configuration must be specified directory(ies).");
-
+    
     String[] confDirArr = confDirs.split(" ");
     Preconditions.checkState(confDirArr.length > 0, CONFIG_DIRS + " must be specified at least one.");
 
+    dirs = new HashSet<String>();
+    
     for (int i = 0; i < confDirArr.length; i++) {
       String path = context.getString(CONFIG_DIRS + "." + confDirArr[i] + "." + CONFIG_PATH);
+      dirs.add(path);
       if (path == null) {
         logger.warn("Configuration is empty : " + CONFIG_DIRS + "." + confDirArr[i] + "." + CONFIG_PATH);
         continue;
       }
     }
+    
   }
 
 
   @Override
   public void start() {
     logger.info("Source Starting..");
+    watchDirs = new HashSet<WatchDir>();
     
     if (sourceCounter == null) {
       sourceCounter = new SourceCounter(getName());
     }
-
+    
     try{
-    	new WatchDir(Paths.get("/tmp/spoolDir"), this).processEvents();
+	    for (String path : dirs){
+	    	WatchDir watchDir = new WatchDir(FileSystems.getDefault().getPath(path), this);
+	    	watchDir.proccesEvents();
+	    	watchDirs.add(watchDir);
+	    }
     }catch (IOException e){
-    	logger.error("IOException");
+    	e.printStackTrace();
     }
-
+    
     sourceCounter.start();
     super.start();
   }
 
   @Override
   public void stop() {
-    logger.info("Source Stopping..");
-    sourceCounter.stop();
+	super.stop();
+	sourceCounter.stop();
+	logger.info("SpoolDir source {} stopped. Metrics: {}", getName(),sourceCounter);
+	for (WatchDir watchDir: watchDirs){
+    	watchDir.stop();
+    }	
   }
 }

@@ -27,7 +27,8 @@ public class WatchDir {
     private final WatchService watcher;
     private final Map<WatchKey,Path> keys;
     private AbstractSource source;
-    private Hashtable<String, FileSet> fileSetMap;
+    private HashMap<String, FileSet> fileSetMap;
+    private HashMap<String, String> filePathsAndKeys;
     
     private static final Logger logger = LoggerFactory.getLogger(WatchDir.class);
     private String OS;
@@ -54,7 +55,18 @@ public class WatchDir {
                 logger.info("update: " +  "-> " + prev + " " + dir);
             }
         }
+        
         keys.put(key, dir);
+        
+        File folder = dir.toFile();
+        
+        for (final File fileEntry : folder.listFiles()) {
+            if (!fileEntry.isDirectory()) {
+            	addFileSetToMap(fileEntry.toPath(),false);                    
+            } else {
+            	logger.warn("FileEntry found as directory --> TODO: debug this case");
+            }
+        }
     }
  
     /**
@@ -87,96 +99,38 @@ public class WatchDir {
         this.watcher = FileSystems.getDefault().newWatchService();
         this.keys = new HashMap<WatchKey,Path>();
         
-        OS = System.getProperty("os.name").toLowerCase();
         
-        if ( OS.indexOf("win") >= 0)
+        String osName = System.getProperty("os.name").toLowerCase();
+        
+        if ( osName.indexOf("win") >= 0)
         	OS = "win";
-        else if ( OS.indexOf("nix") >= 0 || OS.indexOf("nux") >= 0 || OS.indexOf("aix") > 0)
+        else if ( osName.indexOf("nix") >= 0 || osName.indexOf("nux") >= 0 || osName.indexOf("aix") > 0)
         	OS = "unix";
         else if ( OS.indexOf("mac") >= 0 )
         	OS = "mac";
         else if ( OS.indexOf("sunos") >= 0 )
         	OS = "solaris";
+        else
+        	OS = "unknown";
 
-        	
-        this.fileSetMap = new Hashtable<String,FileSet>();
+        
+        this.filePathsAndKeys = new HashMap<String,String>();
+        this.fileSetMap = new HashMap<String,FileSet>();
         this.source = source;
  
-        logger.info("Scanning " + dir);
+        logger.info("Scanning directory: " + dir);
         registerAll(dir);
         logger.info("Done.");
     }
     
-    /**
-     * Process all events for keys queued to the watcher
-     */
-    void processEvents() {
-    	
-    	logger.debug("WatchDir: processEvents");
-    	
-        for (;;) {
- 
-            // wait for key to be signalled
-            WatchKey key;
-            try {
-                key = watcher.take();
-            } catch (InterruptedException x) {
-                return;
-            }
- 
-            Path dir = keys.get(key);
-            if (dir == null) {
-            	logger.error("WatchKey not recognized!!");
-                continue;
-            }
- 
-            for (WatchEvent<?> event: key.pollEvents()) {
-                Kind<?> kind = event.kind();
-
-                // Context for directory entry event is the file name of entry
-                WatchEvent<Path> ev = cast(event);
-                Path name = ev.context();
-                Path path = dir.resolve(name);
- 
-                // print out event
-                logger.debug(event.kind().name() + ": " + path);
-                
-                try{
-	                if (kind == ENTRY_CREATE){
-	                	fileCreated(path);
-	                }
-	                else if (kind == ENTRY_MODIFY){
-	                	fileModified(path);
-	                }
-	                else if (kind == ENTRY_DELETE){
-	                	fileDeleted(path);
-	                }
-                } catch (IOException x) {
-                    x.printStackTrace();
-                }
-            }
-
- 
-            // reset key and remove from set if directory no longer accessible
-            boolean valid = key.reset();
-            if (!valid) {
-                keys.remove(key);
-                // all directories are inaccessible
-                if (keys.isEmpty()) {
-                    break;
-                }
-            }
-        }
-    }
-    
-    private void fileCreated(Path path) throws IOException{
+    private void fileCreated(Path path) throws IOException, InterruptedException{
     	
     	logger.debug("WatchDir: fileCreated");
     	
     	if (Files.isDirectory(path, NOFOLLOW_LINKS))
             registerAll(path);
     	else{
-    		addFileSetToMap(path); 		
+    		addFileSetToMap(path,true); 		
     	}
     }
     
@@ -206,47 +160,69 @@ public class WatchDir {
     	logger.debug("WatchDir: getFileSet");
     	
     	FileSet fileSet;
-		String key;
+		String fileKey;
 		
 		if ( OS == "win")
-			key = path.toString();
-		else if ( OS == "unix" || OS == "mac " || OS == "mac " || OS == "solaris ")
-			key = Files.readAttributes(path, BasicFileAttributes.class).fileKey().toString();
+			fileKey = path.toString();
 		else
-			throw new IOException("OS unknown");
+			fileKey = Files.readAttributes(path, BasicFileAttributes.class).fileKey().toString();
 		
-		if (fileSetMap.containsKey(key)) 
-			fileSet = fileSetMap.get(key);
+		if (fileSetMap.containsKey(fileKey)) 
+			fileSet = fileSetMap.get(fileKey);
 		else
-			fileSet = addFileSetToMap(path);
+			fileSet = addFileSetToMap(path,true);
+			
 		
 		return fileSet;
 	}
     
-    private FileSet addFileSetToMap(Path path) throws IOException{
+    private FileSet addFileSetToMap(Path path, boolean fromBeginning) throws IOException{
+    	
     	logger.debug("WatchDir: addFileSetToMap");
-    	String key;
+    	
+    	String fileKey;
     	FileSet fileSet;
     	
 		if ( OS == "win")
-			key = path.toString();
-		else if ( OS == "unix" || OS == "mac " || OS == "mac " || OS == "solaris ")
-			key = Files.readAttributes(path, BasicFileAttributes.class).fileKey().toString();
+			fileKey = path.toString();
 		else
-			throw new IOException("OS unknown");
+			fileKey = Files.readAttributes(path, BasicFileAttributes.class).fileKey().toString();
 		
-		if (!fileSetMap.containsKey(key)) {
-			fileSet = new FileSet(path.toString());
-			fileSetMap.put(key, fileSet);
+		if (!fileSetMap.containsKey(fileKey)) {
+			logger.info("Scanning file: " + path.toString() + " with key: " + fileKey);
+			
+			fileSet = new FileSet(path.toString(),fromBeginning);
+			filePathsAndKeys.put(path.toString(), fileKey);
+			fileSetMap.put(fileKey, fileSet);
 		}
 		else
-			fileSet = fileSetMap.get(key);
+			fileSet = fileSetMap.get(fileKey);
 
 		return fileSet;
     }
 
-	private void fileDeleted(Path path){
-    	
+	private void fileDeleted(Path path) throws IOException{
+		logger.debug("WatchDir: fileDeleted");
+		
+		String fileKey=null;
+		
+		if ( OS == "win"){
+			fileKey = path.toString();
+		}
+		else{
+			if (filePathsAndKeys.containsKey(path.toString())){
+				fileKey = filePathsAndKeys.get(path.toString());
+			}
+			else
+				logger.error("File key of file " + path.toString() + " not found in filePathsAndKeys hashMap");
+		}
+		
+		if (fileKey != null){
+			logger.info("Removing file: " + path + " with key: " + fileKey);
+			fileSetMap.get(fileKey).clear();
+			fileSetMap.get(fileKey).close();
+			fileSetMap.remove(fileKey);
+		}
     }
         
 	private void sendEvent(FileSet fileSet) {
@@ -262,5 +238,78 @@ public class WatchDir {
 		source.getChannelProcessor().processEvent(event);
 
 		fileSet.clear();
+    }
+
+	public void proccesEvents() {
+		logger.debug("WatchDir: run");
+		try{
+	        for (;;) {
+	        	
+	        	logger.debug("Sigo en el for");
+	 
+	            // wait for key to be signalled
+	            WatchKey key;
+	            key = watcher.take();
+	            
+	            Path dir = keys.get(key);
+	            if (dir == null) {
+	            	logger.error("WatchKey not recognized!!");
+	                continue;
+	            }
+	            
+	            for (WatchEvent<?> event: key.pollEvents()) {
+	                Kind<?> kind = event.kind();
+	
+	                // Context for directory entry event is the file name of entry
+	                WatchEvent<Path> ev = cast(event);
+	                Path name = ev.context();
+	                Path path = dir.resolve(name);
+	 
+	                // print out event
+	                logger.debug(event.kind().name() + ": " + path);
+
+	                if (kind == ENTRY_MODIFY){
+	                	fileModified(path);
+	                }
+	                else if (kind == ENTRY_CREATE){
+	                	fileCreated(path);
+	                }
+	                else if (kind == ENTRY_DELETE){
+	                	fileDeleted(path);
+	                }
+	            }
+	 
+	            // reset key and remove from set if directory no longer accessible
+	            boolean valid = key.reset();
+	            if (!valid) {
+	            	logger.debug("valid?");
+	                keys.remove(key);
+	                // all directories are inaccessible
+	                if (keys.isEmpty()) {
+	                    break;
+	                }
+	            }
+	        }
+        } catch (IOException x) {
+            x.printStackTrace();
+        } catch (InterruptedException x) {
+        	x.printStackTrace();
+            return;
+        }
+	}
+	
+    
+    public void stop(){
+    	
+    	logger.debug("WatchDir: stop");
+    	try {
+	    	for (FileSet fileSet: fileSetMap.values()){
+	    		logger.debug("Closing file: " + fileSet.getFilePath());
+	    		fileSet.clear();
+	    		fileSet.close();
+	    	}
+    	}catch(IOException x){
+    		x.printStackTrace();
+	    }
     }
 }
