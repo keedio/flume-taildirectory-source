@@ -43,7 +43,7 @@ public class FileSet {
   private long lastAppendTime;
   private Path filePath;
   
-  public FileSet(Path filePath, boolean readLastLine) throws IOException {
+  public FileSet(Path filePath, String startFrom) throws IOException {
       
 	  this.bufferList = new ArrayList<String>();
 	  this.lastAppendTime = System.currentTimeMillis(); 
@@ -52,11 +52,15 @@ public class FileSet {
 	  File f = new File(filePath.toString());
 
 	  rReader = new RandomAccessFile(f, "r");
-	  if (readLastLine){
-		  seekToLastLine(rReader);
+	  
+	  if (startFrom.equals("begin")){
+		  rReader.seek(0);
 	  }
-	  else{ 
+	  else if (startFrom.equals("end")){ 
 		  rReader.seek(f.length());
+	  }
+	  else if (startFrom.equals("lastLine")){ 
+		  seekToLastLine(rReader);
 	  }
 	  
 	  logger.debug("File length --> " + f.length());
@@ -65,8 +69,6 @@ public class FileSet {
 	  headers = new HashMap<String, String>();
 	  logger.debug("FileSet has been created " + filePath);
   }
-  
-  
 
   // This method is use to avoid lost last line log
   private void seekToLastLine(RandomAccessFile rReader) throws IOException {
@@ -82,10 +84,12 @@ public class FileSet {
 		  if( readByte == 0xA ) {
 			  if( filePointer != fileLength ){
                   posReached = true;
+                  rReader.seek( filePointer );
 			  }
 		  } else if( readByte == 0xD ) {
               if( filePointer != fileLength - 1 ){
             	  posReached = true;
+            	  rReader.seek( filePointer );
               }
           }
               

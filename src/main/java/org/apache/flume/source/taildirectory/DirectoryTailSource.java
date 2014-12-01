@@ -38,12 +38,14 @@ public class DirectoryTailSource extends AbstractSource implements
 	
   private static final String CONFIG_DIRS = "dirs";
   private static final String CONFIG_PATH = "path";
+  private static final String UNLOCK_TIME = "unlockFileTime";
     
   private static final Logger logger = LoggerFactory.getLogger(DirectoryTailSource.class);
   private SourceCounter sourceCounter;
   private String confDirs;
   private Set<String> dirs;
   private Set<WatchDir> watchDirs;
+  private long timeToUnlockFile;
   
   public void configure(Context context) {
     logger.info("Source Configuring..");
@@ -53,6 +55,8 @@ public class DirectoryTailSource extends AbstractSource implements
     
     String[] confDirArr = confDirs.split(" ");
     Preconditions.checkState(confDirArr.length > 0, CONFIG_DIRS + " must be specified at least one.");
+    
+    timeToUnlockFile = context.getLong(UNLOCK_TIME, 1L);
 
     dirs = new HashSet<String>();
     
@@ -79,7 +83,7 @@ public class DirectoryTailSource extends AbstractSource implements
     
     try{
 	    for (String path : dirs){
-	    	WatchDir watchDir = new WatchDir(FileSystems.getDefault().getPath(path), this);
+	    	WatchDir watchDir = new WatchDir(FileSystems.getDefault().getPath(path), this, timeToUnlockFile);
 	    	watchDir.proccesEvents();
 	    	watchDirs.add(watchDir);
 	    }

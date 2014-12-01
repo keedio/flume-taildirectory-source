@@ -32,10 +32,10 @@ public class WatchDir {
     private AbstractSource source;
     private HashMap<String, FileSet> fileSetMap;
     private HashMap<String, String> filePathsAndKeys;
+    private long timeToUnlockFile;
     
     private static final Logger logger = LoggerFactory.getLogger(WatchDir.class);
     private String OS;
-    
 	
 	private final ScheduledExecutorService scheduler =
 		       Executors.newScheduledThreadPool(1);
@@ -48,7 +48,9 @@ public class WatchDir {
     /**
      * Creates a WatchService and registers the given directory
      */
-    WatchDir(Path dir, AbstractSource source) throws IOException {
+    WatchDir(Path dir, AbstractSource source, long timeToUnlockFile) throws IOException {
+    	
+    	this.timeToUnlockFile = timeToUnlockFile;
     	
     	logger.debug("WatchDir: WatchDir");
     	
@@ -79,7 +81,7 @@ public class WatchDir {
         logger.info("Done.");
         
     	final Runnable lastAppend = new CheckLastTimeModified();
-        scheduler.scheduleAtFixedRate(lastAppend, 0, 300, TimeUnit.SECONDS);
+        scheduler.scheduleAtFixedRate(lastAppend, 0, 1, TimeUnit.MINUTES);
         
     }
 
@@ -107,7 +109,7 @@ public class WatchDir {
         
         for (final File fileEntry : folder.listFiles()) {
             if (!fileEntry.isDirectory()) {
-            	addFileSetToMap(fileEntry.toPath(),false);                    
+            	addFileSetToMap(fileEntry.toPath(),"end");                    
             } else {
             	logger.warn("FileEntry found as directory --> TODO: debug this case");
             }
@@ -141,7 +143,7 @@ public class WatchDir {
     	if (Files.isDirectory(path, NOFOLLOW_LINKS))
             registerAll(path);
     	else{
-    		addFileSetToMap(path,false); 		
+    		addFileSetToMap(path,"begin"); 		
     	}
     }
     
@@ -182,14 +184,14 @@ public class WatchDir {
 			fileSet = fileSetMap.get(fileKey);
 		}
 		else{
-			fileSet = addFileSetToMap(path,true);
+			fileSet = addFileSetToMap(path,"lastLine");
 		}
 			
 		
 		return fileSet;
 	}
     
-    private FileSet addFileSetToMap(Path path, boolean readLastLine) throws IOException{
+    private FileSet addFileSetToMap(Path path, String startFrom) throws IOException{
     	
     	logger.debug("WatchDir: addFileSetToMap");
     	
@@ -204,9 +206,11 @@ public class WatchDir {
 		if (!fileSetMap.containsKey(fileKey)) {
 			logger.info("Scanning file: " + path.toString() + " with key: " + fileKey);
 			
-			fileSet = new FileSet(path,readLastLine);
-			filePathsAndKeys.put(path.toString(), fileKey);
-			fileSetMap.put(fileKey, fileSet);
+			synchronized (fileSetMap){
+				fileSet = new FileSet(path,startFrom);
+				filePathsAndKeys.put(path.toString(), fileKey);
+				fileSetMap.put(fileKey, fileSet);
+			}
 		}
 		else
 			fileSet = fileSetMap.get(fileKey);
@@ -232,10 +236,12 @@ public class WatchDir {
 		
 		if (fileKey != null){
 			logger.info("Removing file: " + path + " with key: " + fileKey);
-			if (fileSetMap.containsKey(fileKey)){
-				fileSetMap.get(fileKey).clear();
-				fileSetMap.get(fileKey).close();
-				fileSetMap.remove(fileKey);
+			synchronized (fileSetMap){
+				if (fileSetMap.containsKey(fileKey)){
+					fileSetMap.get(fileKey).clear();
+					fileSetMap.get(fileKey).close();
+					fileSetMap.remove(fileKey);
+				}
 			}
 			if (filePathsAndKeys.containsKey(path.toString())){
 				filePathsAndKeys.remove(path.toString());	
@@ -264,9 +270,7 @@ public class WatchDir {
 		try{
 	        for (;;) {
 	        	
-	        	logger.debug("Sigo en el for");
-	 
-	            // wait for key to be signalled
+	        	// wait for key to be signalled
 	            WatchKey key;
 	            key = watcher.take();
 	            Path dir = keys.get(key);
@@ -333,14 +337,13 @@ public class WatchDir {
     }
     
     private class CheckLastTimeModified implements Runnable {
-    	
-    	private static final int UNLOCK_TIME=10;
 
     	@Override
     	public void run() {
     		
     		long lastAppendTime, currentTime;
     		String fileKey;
+    		
     		
     		try{
 	    		
@@ -354,23 +357,26 @@ public class WatchDir {
 	    			else
 	    				fileKey = Files.readAttributes(fileSet.getFilePath(), 
 	    						BasicFileAttributes.class).fileKey().toString();
-    			
-	    			if (currentTime - lastAppendTime > UNLOCK_TIME*60*1000){
-	    				logger.info("File: " + fileSet.getFilePath() + 
-	    						" not modified after " + UNLOCK_TIME + " minutes" +
-	    						" removing from monitoring list");
-	    				fileSetMap.get(fileKey).clear();
-	    				fileSetMap.get(fileKey).close();
-	    				fileSetMap.remove(fileKey);
-	    				filePathsAndKeys.remove(fileSet.getFilePath().toString());
-	    			}
 	    			
+	    			logger.debug("Checking file: " + fileSet.getFilePath());
+	    			logger.debug("Last append time: " + TimeUnit.MILLISECONDS.toSeconds(
+	    					lastAppendTime) + " seconds");
+    			
+	    			synchronized(fileSetMap){
+		    			if (currentTime - lastAppendTime > TimeUnit.MINUTES.toMillis(timeToUnlockFile)){
+		    				logger.info("File: " + fileSet.getFilePath() + 
+		    						" not modified after " + timeToUnlockFile + " minutes" +
+		    						" removing from monitoring list");
+		    				fileSetMap.get(fileKey).clear();
+		    				fileSetMap.get(fileKey).close();
+		    				fileSetMap.remove(fileKey);
+		    				filePathsAndKeys.remove(fileSet.getFilePath().toString());
+		    			}
+	    			}
 	    		}
     		}catch (IOException e){
 	    		e.printStackTrace();
 	    	}
-
-
     	}
     }
 }
