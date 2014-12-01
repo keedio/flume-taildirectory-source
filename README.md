@@ -36,3 +36,10 @@ agent.sources.tailDir.dirs = tmpDir varLogDir
 agent.sources.tailDir.dirs.tmpDir.path = /tmp
 agent.sources.dirMon.dirs.varLogDir.path = /var/log
 ```
+
+TO DO:
+======
+
+* Include multi thread posibility to parallelize tasks
+* Test synchronization between threads
+* Make time to release not midified files configurable.
