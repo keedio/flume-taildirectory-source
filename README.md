@@ -27,6 +27,7 @@ Configuration
 | Type | - | org.apache.flume.source.taildirectory.DirectoryTailSource |
 | dirs | - | Nick of directories, it's such as list of what directories are monitored |
 | dirs.NICK.path | - | Directory path |
+| unlockFileTyme | 1 | Delay to check not modified files to unlock the access to them ( in minutes )
 
 * Example
 ```
@@ -42,4 +43,3 @@ TO DO:
 
 * Include multi thread posibility to parallelize tasks
 * Test synchronization between threads
-* Make time to release not midified files configurable.
