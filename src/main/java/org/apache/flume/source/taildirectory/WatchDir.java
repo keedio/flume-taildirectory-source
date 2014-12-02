@@ -342,36 +342,28 @@ public class WatchDir {
     	public void run() {
     		
     		long lastAppendTime, currentTime;
-    		String fileKey;
-    		
-    		
+    		FileSet fileSet;
+	
     		try{
-	    		
-	    		for (FileSet fileSet: fileSetMap.values()){
+	    		Set<String> fileKeySet = new HashSet<String>(fileSetMap.keySet());
+   			
+	    		for (String fileKey: fileKeySet){
+	    			
+
+	    			fileSet = fileSetMap.get(fileKey);
 	    			
 	    			lastAppendTime = fileSet.getLastAppendTime();
 	    			currentTime = System.currentTimeMillis();
-	    			
-	    			if ( OS == "win")
-	    				fileKey = fileSet.getFilePath().toString();
-	    			else
-	    				fileKey = Files.readAttributes(fileSet.getFilePath(), 
-	    						BasicFileAttributes.class).fileKey().toString();
-	    			
 	    			logger.debug("Checking file: " + fileSet.getFilePath());
-	    			logger.debug("Last append time: " + TimeUnit.MILLISECONDS.toSeconds(
-	    					lastAppendTime) + " seconds");
     			
-	    			synchronized(fileSetMap){
-		    			if (currentTime - lastAppendTime > TimeUnit.MINUTES.toMillis(timeToUnlockFile)){
-		    				logger.info("File: " + fileSet.getFilePath() + 
-		    						" not modified after " + timeToUnlockFile + " minutes" +
-		    						" removing from monitoring list");
-		    				fileSetMap.get(fileKey).clear();
-		    				fileSetMap.get(fileKey).close();
-		    				fileSetMap.remove(fileKey);
-		    				filePathsAndKeys.remove(fileSet.getFilePath().toString());
-		    			}
+	    			if (currentTime - lastAppendTime > TimeUnit.MINUTES.toMillis(timeToUnlockFile)){
+	    				logger.info("File: " + fileSet.getFilePath() + 
+	    						" not modified after " + timeToUnlockFile + " minutes" +
+	    						" removing from monitoring list");
+	    				fileSetMap.get(fileKey).clear();
+	    				fileSetMap.get(fileKey).close();
+	    				filePathsAndKeys.remove(fileSet.getFilePath().toString());
+	    				fileSetMap.remove(fileKey);
 	    			}
 	    		}
     		}catch (IOException e){
