@@ -35,8 +35,8 @@ agent.sources = tailDir
 agent.sources.tailDir.type = org.apache.flume.source.taildirectory.DirectoryTailSource
 agent.sources.tailDir.dirs = tmpDir varLogDir
 agent.sources.tailDir.dirs.tmpDir.path = /tmp
-agent.sources.dirMon.dirs.varLogDir.path = /var/log
-agent.sources.dirMon.dirs.varLogDir.unlockFileTime = 1
+agent.sources.taildir.dirs.varLogDir.path = /var/log
+agent.sources.taildir.dirs.varLogDir.unlockFileTime = 1
 ```
 
 TO DO:
