@@ -1,68 +1,81 @@
 package org.apache.flume.source.taildirectory;
 
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
 import org.apache.flume.instrumentation.MonitoredCounterGroup;
 
-public class DirectoryTailSourceCounter extends MonitoredCounterGroup implements
-		DirectoryTailSourceCounterMBean {
+public class DirectoryTailSourceCounter extends MonitoredCounterGroup implements DirectoryTailSourceCounterMBean {
 
-    private long counter_message_sent;
-    private long counter_message_sent_error;
-    private long last_sent;
-    private long start_time;
-    private long sendThroughput;
+	private long startTime;
+	
+	private static final String COUNTER_MESSAGE_SENT = "source.counter.message.sent";
+	private static final String COUNTER_MESSAGE_SENT_ERROR = "source.counter.message.sent";
+	private static final String AVERAGE_THROUGHPUT = "source.average.throughput";
+	private static final String CURRENT_THROUGHPUT = "source.current.throughput";
+	
+	private final ScheduledExecutorService scheduler =
+		       Executors.newScheduledThreadPool(1);
     
     public static final String[] ATTRIBUTES = {
-    	"counter_message_sent", "counter_message_sent_error", "last_sent", "start_time", "sendTroughput"
+    	COUNTER_MESSAGE_SENT, COUNTER_MESSAGE_SENT_ERROR, CURRENT_THROUGHPUT, AVERAGE_THROUGHPUT
     };
     
     public DirectoryTailSourceCounter(String name) {
         super(MonitoredCounterGroup.Type.SOURCE, name, ATTRIBUTES);
-        counter_message_sent = 0;
-        counter_message_sent_error = 0;
-        last_sent = 0;
-        sendThroughput = 0;
-        setStartTime();
+        startTime = System.currentTimeMillis()/1000;
+        
+        // Start running current throughput calculate every second 
+        final Runnable runnableThroughput = new ThroughputCalculate();
+        scheduler.scheduleAtFixedRate(runnableThroughput, 0, 1, TimeUnit.SECONDS);
     }
-	
-	@Override
-	public long increaseCounterMessageSent() {
-        last_sent = System.currentTimeMillis();
-        counter_message_sent++;
 
-        if (last_sent > start_time) {
-            sendThroughput = counter_message_sent / ((last_sent - start_time) / 1000);
-        }
-        return counter_message_sent;
+	public void increaseCounterMessageSent() {
+		increment(COUNTER_MESSAGE_SENT);
 	}
 
-	@Override
 	public long getCounterMessageSent() {
-		return counter_message_sent;
+		return get(COUNTER_MESSAGE_SENT);
 	}
 
-	@Override
-	public long getLastSent() {
-		return last_sent;
+	public void increaseCounterMessageSentError() {
+		increment(COUNTER_MESSAGE_SENT_ERROR);
 	}
 
-	@Override
-	public long increaseCounterMessageSentError() {
-		return counter_message_sent_error++;
-	}
-
-	@Override
 	public long getCounterMessageSentError() {
-		return counter_message_sent_error;
+		return get(COUNTER_MESSAGE_SENT_ERROR);
 	}
 
-	@Override
-	public long setStartTime() {
-		return start_time;
+	public long getAverageThroughput() {
+		return get(AVERAGE_THROUGHPUT);
 	}
-
-	@Override
-	public long getSendThroughput() {
-		return sendThroughput;
+	
+	public long getCurrentThroughput() {
+		return get(CURRENT_THROUGHPUT);
 	}
+	
+	private class ThroughputCalculate implements Runnable {
 
+		private long previousMessages=0;
+		private long currentMessages=0;
+		private long currentThroughput=0;
+		private long currentTime=0;
+		private long averageThroughput=0;
+		
+		@Override
+		public void run() {
+			currentMessages = get(COUNTER_MESSAGE_SENT);
+			previousMessages = currentMessages;
+			currentThroughput = currentMessages - previousMessages;
+			set(CURRENT_THROUGHPUT,currentThroughput);
+			
+			currentTime = System.currentTimeMillis()/1000;
+	        
+	        if (currentTime > startTime) {
+	            averageThroughput = currentMessages / ((currentTime - startTime));
+	        }
+	        set(AVERAGE_THROUGHPUT,averageThroughput);
+		}
+	}
 }

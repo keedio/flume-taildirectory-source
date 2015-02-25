@@ -21,8 +21,7 @@ import org.slf4j.LoggerFactory;
 
  
 /**
- * Example to watch a directory (or tree) for changes to files.
- * @param <K>
+ * 
  */
  
 public class WatchDir {
@@ -38,7 +37,9 @@ public class WatchDir {
     private String OS;
 	
 	private final ScheduledExecutorService scheduler =
-		       Executors.newScheduledThreadPool(1);
+		       Executors.newScheduledThreadPool(2);
+	
+	private DirectoryTailSourceCounter counter;
  
     @SuppressWarnings("unchecked")
     static <T> WatchEvent<T> cast(WatchEvent<?> event) {
@@ -48,33 +49,22 @@ public class WatchDir {
     /**
      * Creates a WatchService and registers the given directory
      */
-    WatchDir(Path dir, AbstractSource source, long timeToUnlockFile) throws IOException {
+    WatchDir(Path dir, AbstractSource source, long timeToUnlockFile, DirectoryTailSourceCounter counter) throws IOException {
+   
+     	logger.trace("WatchDir: WatchDir");
     	
-    	this.timeToUnlockFile = timeToUnlockFile;
-    	
-    	logger.debug("WatchDir: WatchDir");
-    	
-        this.watcher = FileSystems.getDefault().newWatchService();
-        this.keys = new HashMap<WatchKey,Path>();
+     	this.timeToUnlockFile = timeToUnlockFile;
+     	this.counter = counter;
+     	
+        this.source = source;
         
-        
-        String osName = System.getProperty("os.name").toLowerCase();
-        
-        if ( osName.indexOf("win") >= 0)
-        	OS = "win";
-        else if ( osName.indexOf("nix") >= 0 || osName.indexOf("nux") >= 0 || osName.indexOf("aix") > 0)
-        	OS = "unix";
-        else if ( OS.indexOf("mac") >= 0 )
-        	OS = "mac";
-        else if ( OS.indexOf("sunos") >= 0 )
-        	OS = "solaris";
-        else
-        	OS = "unknown";
+    	this.watcher = FileSystems.getDefault().newWatchService();
+        this.keys = new HashMap<WatchKey,Path>( );        
 
-        
         this.filePathsAndKeys = new HashMap<String,String>();
         this.fileSetMap = new HashMap<String,FileSet>();
-        this.source = source;
+        
+        this.OS = getOSType();
  
         logger.info("Scanning directory: " + dir);
         registerAll(dir);
@@ -83,17 +73,38 @@ public class WatchDir {
     	final Runnable lastAppend = new CheckLastTimeModified();
         scheduler.scheduleAtFixedRate(lastAppend, 0, 1, TimeUnit.MINUTES);
         
+        final Runnable printThroughput = new PrintThroughput();
+        scheduler.scheduleAtFixedRate(printThroughput, 0, 5, TimeUnit.SECONDS);
     }
+
+	private String getOSType() {
+		 String osName = System.getProperty("os.name").toLowerCase();
+	        
+	        if ( osName.indexOf("win") >= 0)
+	        	OS = "win";
+	        else if ( osName.indexOf("nix") >= 0 || osName.indexOf("nux") >= 0 || osName.indexOf("aix") > 0)
+	        	OS = "unix";
+	        else if ( OS.indexOf("mac") >= 0 )
+	        	OS = "mac";
+	        else if ( OS.indexOf("sunos") >= 0 )
+	        	OS = "solaris";
+	        else
+	        	OS = "unknown";
+	        
+	        return OS;
+	}
 
 	/**
      * Register the given directory with the WatchService
      */
     private void register(Path dir) throws IOException {
     	
-    	logger.debug("WatchDir: register");
+    	logger.trace("WatchDir: register");
     	
         WatchKey key = dir.register(watcher, ENTRY_CREATE, ENTRY_DELETE, ENTRY_MODIFY);
         Path prev = keys.get(key);
+        
+        //TODO: Change this log lines, are not descriptive
         logger.info("prev: " + prev);
         if (prev == null) {
             logger.info("register: " + dir);            
@@ -122,7 +133,7 @@ public class WatchDir {
      */
     private void registerAll(final Path start) throws IOException {
     	
-    	logger.debug("WatchDir: registerAll");
+    	logger.trace("WatchDir: registerAll");
     	
         // register directory and sub-directories
         Files.walkFileTree(start, new SimpleFileVisitor<Path>() {
@@ -138,7 +149,7 @@ public class WatchDir {
  
     private void fileCreated(Path path) throws IOException, InterruptedException{
     	
-    	logger.debug("WatchDir: fileCreated");
+    	logger.trace("WatchDir: fileCreated");
     	
     	if (Files.isDirectory(path, NOFOLLOW_LINKS))
             registerAll(path);
@@ -149,7 +160,7 @@ public class WatchDir {
     
     private void fileModified(Path path) throws IOException{
     	
-    	logger.debug("WatchDir: fileModified");
+    	logger.trace("WatchDir: fileModified");
     	
     	String buffer;
     	FileSet fileSet = getFileSet(path);
@@ -170,7 +181,7 @@ public class WatchDir {
     
     private FileSet getFileSet(Path path) throws IOException {
     	
-    	logger.debug("WatchDir: getFileSet");
+    	logger.trace("WatchDir: getFileSet");
     	
     	FileSet fileSet;
 		String fileKey;
@@ -193,7 +204,7 @@ public class WatchDir {
     
     private FileSet addFileSetToMap(Path path, String startFrom) throws IOException{
     	
-    	logger.debug("WatchDir: addFileSetToMap");
+    	logger.trace("WatchDir: addFileSetToMap");
     	
     	String fileKey;
     	FileSet fileSet;
@@ -219,7 +230,7 @@ public class WatchDir {
     }
 
 	private void fileDeleted(Path path) throws IOException{
-		logger.debug("WatchDir: fileDeleted");
+		logger.trace("WatchDir: fileDeleted");
 		
 		String fileKey=null;
 		
@@ -251,7 +262,7 @@ public class WatchDir {
         
 	private void sendEvent(FileSet fileSet) {
 		
-		logger.debug("WatchDir: sendEvent");
+		logger.trace("WatchDir: sendEvent");
 		
 		if (fileSet.getBufferList().isEmpty())
 			return;
@@ -260,17 +271,18 @@ public class WatchDir {
 		Event event = EventBuilder.withBody(String.valueOf(sb).getBytes(),
 				fileSet.getHeaders());
 		source.getChannelProcessor().processEvent(event);
-
+		
+		counter.increaseCounterMessageSent();
 		fileSet.clear();
     }
 
 	public void proccesEvents() {
-		logger.debug("WatchDir: run");
+		logger.trace("WatchDir: run");
 
 		try{
 	        for (;;) {
 	        	
-	        	// wait for key to be signalled
+	        	// wait for key to be signaled
 	            WatchKey key;
 	            key = watcher.take();
 	            Path dir = keys.get(key);
@@ -289,7 +301,7 @@ public class WatchDir {
 	                Path path = dir.resolve(name);
 	 
 	                // print out event
-	                logger.debug(event.kind().name() + ": " + path);
+	                logger.trace(event.kind().name() + ": " + path);
 
 	                if (kind == ENTRY_MODIFY){
 	                	fileModified(path);
@@ -305,7 +317,6 @@ public class WatchDir {
 	            // reset key and remove from set if directory no longer accessible
 	            boolean valid = key.reset();
 	            if (!valid) {
-	            	logger.debug("valid?");
 	                keys.remove(key);
 	                // all directories are inaccessible
 	                if (keys.isEmpty()) {
@@ -324,7 +335,7 @@ public class WatchDir {
     
     public void stop(){
     	
-    	logger.debug("WatchDir: stop");
+    	logger.trace("WatchDir: stop");
     	try {
 	    	for (FileSet fileSet: fileSetMap.values()){
 	    		logger.debug("Closing file: " + fileSet.getFilePath());
@@ -348,7 +359,6 @@ public class WatchDir {
 	    		Set<String> fileKeySet = new HashSet<String>(fileSetMap.keySet());
    			
 	    		for (String fileKey: fileKeySet){
-	    			
 
 	    			fileSet = fileSetMap.get(fileKey);
 	    			
@@ -370,5 +380,14 @@ public class WatchDir {
 	    		e.printStackTrace();
 	    	}
     	}
+    }
+    
+    private class PrintThroughput implements Runnable {
+
+		@Override
+		public void run() {
+			logger.debug("Current throughput: " + counter.getCurrentThroughput());
+		}
+    	
     }
 }

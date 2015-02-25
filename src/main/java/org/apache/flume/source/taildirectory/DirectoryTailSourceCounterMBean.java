@@ -1,13 +1,12 @@
 package org.apache.flume.source.taildirectory;
 
 public interface DirectoryTailSourceCounterMBean {
-	public long increaseCounterMessageSent();
-
+	
+	public void increaseCounterMessageSent();
+	public void increaseCounterMessageSentError();
+	
     public long getCounterMessageSent();
-	public long getLastSent();
-	public long increaseCounterMessageSentError();
 	public long getCounterMessageSentError();
-	public long setStartTime();
-	public long getStartTime();
-    public long getSendThroughput();
+    public long getCurrentThroughput();
+    public long getAverageThroughput();
 }

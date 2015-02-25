@@ -26,7 +26,6 @@ import java.util.Set;
 import org.apache.flume.Context;
 import org.apache.flume.EventDrivenSource;
 import org.apache.flume.conf.Configurable;
-import org.apache.flume.instrumentation.SourceCounter;
 import org.apache.flume.source.AbstractSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,11 +40,11 @@ public class DirectoryTailSource extends AbstractSource implements
   private static final String UNLOCK_TIME = "unlockFileTime";
     
   private static final Logger logger = LoggerFactory.getLogger(DirectoryTailSource.class);
-  private SourceCounter sourceCounter;
   private String confDirs;
   private Set<String> dirs;
   private Set<WatchDir> watchDirs;
   private long timeToUnlockFile;
+  private DirectoryTailSourceCounter counter;
   
   public void configure(Context context) {
     logger.info("Source Configuring..");
@@ -69,6 +68,7 @@ public class DirectoryTailSource extends AbstractSource implements
       }
     }
     
+    counter = new DirectoryTailSourceCounter("SOURCE.DirectoryTailSource-"+this.getName());
   }
 
 
@@ -76,14 +76,12 @@ public class DirectoryTailSource extends AbstractSource implements
   public void start() {
     logger.info("Source Starting..");
     watchDirs = new HashSet<WatchDir>();
-    
-    if (sourceCounter == null) {
-      sourceCounter = new SourceCounter(getName());
-    }
+    counter.start();
     
     try{
 	    for (String path : dirs){
-	    	WatchDir watchDir = new WatchDir(FileSystems.getDefault().getPath(path), this, timeToUnlockFile);
+	    	WatchDir watchDir = new WatchDir(FileSystems.getDefault().getPath(path), 
+	    			this, timeToUnlockFile, counter);
 	    	watchDir.proccesEvents();
 	    	watchDirs.add(watchDir);
 	    }
@@ -91,15 +89,14 @@ public class DirectoryTailSource extends AbstractSource implements
     	e.printStackTrace();
     }
     
-    sourceCounter.start();
     super.start();
   }
 
   @Override
   public void stop() {
 	super.stop();
-	sourceCounter.stop();
-	logger.info("SpoolDir source {} stopped. Metrics: {}", getName(),sourceCounter);
+	counter.stop();
+	logger.info("DirectoryTailSource {} stopped. Metrics: {}", getName(),counter);
 	for (WatchDir watchDir: watchDirs){
     	watchDir.stop();
     }	
