@@ -34,151 +34,149 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class FileSet {
-  private static final Logger logger = LoggerFactory.getLogger(FileSet.class);
-  private BufferedReader bufferedReader;
-  private RandomAccessFile rReader;
-  private Transaction transaction;
-  private List<String> bufferList;
-  private Map<String, String> headers;
-  private long lastAppendTime;
-  private Path filePath;
-  
-  public FileSet(Path filePath, String startFrom) throws IOException {
-      
-	  this.bufferList = new ArrayList<String>();
-	  this.lastAppendTime = System.currentTimeMillis(); 
-	  this.filePath = filePath;
+	private static final Logger logger = LoggerFactory.getLogger(FileSet.class);
+	private BufferedReader bufferedReader;
+	private RandomAccessFile rReader;
+	private Transaction transaction;
+	private List<String> bufferList;
+	private Map<String, String> headers;
+	private long lastAppendTime;
+	private Path filePath;
 
-	  File f = new File(filePath.toString());
+	public FileSet(Path filePath, String startFrom) throws IOException {
 
-	  rReader = new RandomAccessFile(f, "r");
-	  
-	  if (startFrom.equals("begin")){
-		  rReader.seek(0);
-	  }
-	  else if (startFrom.equals("end")){ 
-		  rReader.seek(f.length());
-	  }
-	  else if (startFrom.equals("lastLine")){ 
-		  seekToLastLine(rReader);
-	  }
-	  
-	  logger.debug("File length --> " + f.length());
-	  logger.debug("File pointer --> " + rReader.getFilePointer());
+		this.bufferList = new ArrayList<String>();
+		this.lastAppendTime = System.currentTimeMillis();
+		this.filePath = filePath;
 
-	  headers = new HashMap<String, String>();
-	  logger.debug("FileSet has been created " + filePath);
-  }
+		File f = new File(filePath.toString());
 
-  // This method is use to avoid lost last line log
-  private void seekToLastLine(RandomAccessFile rReader) throws IOException {
-	  
-	  long fileLength = rReader.length() -1 ;
-	  long filePointer = fileLength;
-	  boolean posReached = false;
-	  int readByte = 0;
-	  
-	  while (filePointer != -1 && !posReached){
-		  rReader.seek( filePointer );
-		  readByte = rReader.readByte();
-		  if( readByte == 0xA ) {
-			  if( filePointer != fileLength ){
-                  posReached = true;
-                  rReader.seek( filePointer );
-			  }
-		  } else if( readByte == 0xD ) {
-              if( filePointer != fileLength - 1 ){
-            	  posReached = true;
-            	  rReader.seek( filePointer );
-              }
-          }
-              
-          filePointer--;
-	  }
-  }
+		rReader = new RandomAccessFile(f, "r");
 
-  public String readLine() throws IOException {
-    return rReader.readLine();
-  }
+		if (startFrom.equals("begin")) {
+			rReader.seek(0);
+		} else if (startFrom.equals("end")) {
+			rReader.seek(f.length());
+		} else if (startFrom.equals("lastLine")) {
+			seekToLastLine(rReader);
+		}
 
-  public long getLastAppendTime() {
-    return lastAppendTime;
-  }
+		logger.debug("File length --> " + f.length());
+		logger.debug("File pointer --> " + rReader.getFilePointer());
 
-  public void setLastAppendTime(long lastAppendTime) {
-    this.lastAppendTime = lastAppendTime;
-  }
+		headers = new HashMap<String, String>();
+		logger.debug("FileSet has been created " + filePath);
+	}
 
-  public boolean appendLine(String buffer) {
-    boolean ret = bufferList.add(buffer);
-    if (ret) {
-      lastAppendTime = System.currentTimeMillis();
-    }
+	// This method is use to avoid lost last line log
+	private void seekToLastLine(RandomAccessFile rReader) throws IOException {
 
-    return ret;
-  }
+		long fileLength = rReader.length() - 1;
+		long filePointer = fileLength;
+		boolean posReached = false;
+		int readByte = 0;
 
-  public int getLineSize() {
-    return bufferList.size();
-  }
+		while (filePointer != -1 && !posReached) {
+			rReader.seek(filePointer);
+			readByte = rReader.readByte();
+			if (readByte == 0xA) {
+				if (filePointer != fileLength) {
+					posReached = true;
+					rReader.seek(filePointer);
+				}
+			} else if (readByte == 0xD) {
+				if (filePointer != fileLength - 1) {
+					posReached = true;
+					rReader.seek(filePointer);
+				}
+			}
 
-  public StringBuffer getAllLines() {
+			filePointer--;
+		}
+	}
 
-    StringBuffer sb = new StringBuffer();
+	public String readLine() throws IOException {
+		return rReader.readLine();
+	}
 
-    for (int i = 0; i < bufferList.size(); i++) {
-      sb.append(bufferList.get(i));
-    }
-    return sb;
-  }
+	public long getLastAppendTime() {
+		return lastAppendTime;
+	}
 
-  public void setHeader(String key, String value) {
-    headers.put(key, value);
-  }
+	public void setLastAppendTime(long lastAppendTime) {
+		this.lastAppendTime = lastAppendTime;
+	}
 
-  public String getHeader(String key) {
-    headers.get(key);
-    return null;
-  }
+	public boolean appendLine(String buffer) {
+		boolean ret = bufferList.add(buffer);
+		if (ret) {
+			lastAppendTime = System.currentTimeMillis();
+		}
 
-  public void clear() {
-    bufferList.clear();
-    headers.clear();
-  }
+		return ret;
+	}
 
-  public Map<String, String> getHeaders() {
-    return headers;
-  }
+	public int getLineSize() {
+		return bufferList.size();
+	}
 
-  public List<String> getBufferList() {
-    return bufferList;
-  }
+	public StringBuffer getAllLines() {
 
-  public void setBufferList(List<String> bufferList) {
-    this.bufferList = bufferList;
-  }
+		StringBuffer sb = new StringBuffer();
 
-  public Transaction getTransaction() {
-    return transaction;
-  }
+		for (int i = 0; i < bufferList.size(); i++) {
+			sb.append(bufferList.get(i));
+		}
+		return sb;
+	}
 
-  public void setTransaction(Transaction transaction) {
-    this.transaction = transaction;
-  }
+	public void setHeader(String key, String value) {
+		headers.put(key, value);
+	}
 
-  public BufferedReader getBufferedReader() {
-    return bufferedReader;
-  }
+	public String getHeader(String key) {
+		headers.get(key);
+		return null;
+	}
 
-  public void setBufferedReader(BufferedReader bufferedReader) {
-    this.bufferedReader = bufferedReader;
-  }
+	public void clear() {
+		bufferList.clear();
+		headers.clear();
+	}
 
-  public void close() throws IOException {
-	  rReader.close();
-  }
-  
-  public Path getFilePath(){
-	  return filePath;
-  }
+	public Map<String, String> getHeaders() {
+		return headers;
+	}
+
+	public List<String> getBufferList() {
+		return bufferList;
+	}
+
+	public void setBufferList(List<String> bufferList) {
+		this.bufferList = bufferList;
+	}
+
+	public Transaction getTransaction() {
+		return transaction;
+	}
+
+	public void setTransaction(Transaction transaction) {
+		this.transaction = transaction;
+	}
+
+	public BufferedReader getBufferedReader() {
+		return bufferedReader;
+	}
+
+	public void setBufferedReader(BufferedReader bufferedReader) {
+		this.bufferedReader = bufferedReader;
+	}
+
+	public void close() throws IOException {
+		rReader.close();
+	}
+
+	public Path getFilePath() {
+		return filePath;
+	}
 }

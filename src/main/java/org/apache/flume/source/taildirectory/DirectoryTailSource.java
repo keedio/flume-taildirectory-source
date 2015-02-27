@@ -33,72 +33,78 @@ import org.slf4j.LoggerFactory;
 import com.google.common.base.Preconditions;
 
 public class DirectoryTailSource extends AbstractSource implements
-    Configurable, EventDrivenSource {
-	
-  private static final String CONFIG_DIRS = "dirs";
-  private static final String CONFIG_PATH = "path";
-  private static final String UNLOCK_TIME = "unlockFileTime";
-    
-  private static final Logger logger = LoggerFactory.getLogger(DirectoryTailSource.class);
-  private String confDirs;
-  private Set<String> dirs;
-  private Set<WatchDir> watchDirs;
-  private long timeToUnlockFile;
-  private DirectoryTailSourceCounter counter;
-  
-  public void configure(Context context) {
-    logger.info("Source Configuring..");
+		Configurable, EventDrivenSource {
 
-    confDirs = context.getString(CONFIG_DIRS).trim();
-    Preconditions.checkState(confDirs != null, "Configuration must be specified directory(ies).");
-    
-    String[] confDirArr = confDirs.split(" ");
-    Preconditions.checkState(confDirArr.length > 0, CONFIG_DIRS + " must be specified at least one.");
-    
-    timeToUnlockFile = context.getLong(UNLOCK_TIME, 1L);
+	private static final String CONFIG_DIRS = "dirs";
+	private static final String CONFIG_PATH = "path";
+	private static final String UNLOCK_TIME = "unlockFileTime";
 
-    dirs = new HashSet<String>();
-    
-    for (int i = 0; i < confDirArr.length; i++) {
-      String path = context.getString(CONFIG_DIRS + "." + confDirArr[i] + "." + CONFIG_PATH);
-      dirs.add(path);
-      if (path == null) {
-        logger.warn("Configuration is empty : " + CONFIG_DIRS + "." + confDirArr[i] + "." + CONFIG_PATH);
-        continue;
-      }
-    }
-    
-    counter = new DirectoryTailSourceCounter("SOURCE.DirectoryTailSource-"+this.getName());
-  }
+	private static final Logger logger = LoggerFactory
+			.getLogger(DirectoryTailSource.class);
+	private String confDirs;
+	private Set<String> dirs;
+	private Set<WatchDir> watchDirs;
+	private long timeToUnlockFile;
+	private DirectoryTailSourceCounter counter;
 
+	public void configure(Context context) {
+		logger.info("Source Configuring..");
 
-  @Override
-  public void start() {
-    logger.info("Source Starting..");
-    watchDirs = new HashSet<WatchDir>();
-    counter.start();
-    
-    try{
-	    for (String path : dirs){
-	    	WatchDir watchDir = new WatchDir(FileSystems.getDefault().getPath(path), 
-	    			this, timeToUnlockFile, counter);
-	    	watchDir.proccesEvents();
-	    	watchDirs.add(watchDir);
-	    }
-    }catch (IOException e){
-    	e.printStackTrace();
-    }
-    
-    super.start();
-  }
+		confDirs = context.getString(CONFIG_DIRS).trim();
+		Preconditions.checkState(confDirs != null,
+				"Configuration must be specified directory(ies).");
 
-  @Override
-  public void stop() {
-	super.stop();
-	counter.stop();
-	logger.info("DirectoryTailSource {} stopped. Metrics: {}", getName(),counter);
-	for (WatchDir watchDir: watchDirs){
-    	watchDir.stop();
-    }	
-  }
+		String[] confDirArr = confDirs.split(" ");
+		Preconditions.checkState(confDirArr.length > 0, CONFIG_DIRS
+				+ " must be specified at least one.");
+
+		timeToUnlockFile = context.getLong(UNLOCK_TIME, 1L);
+
+		dirs = new HashSet<String>();
+
+		for (int i = 0; i < confDirArr.length; i++) {
+			String path = context.getString(CONFIG_DIRS + "." + confDirArr[i]
+					+ "." + CONFIG_PATH);
+			dirs.add(path);
+			if (path == null) {
+				logger.warn("Configuration is empty : " + CONFIG_DIRS + "."
+						+ confDirArr[i] + "." + CONFIG_PATH);
+				continue;
+			}
+		}
+
+		counter = new DirectoryTailSourceCounter("SOURCE.DirectoryTailSource-"
+				+ this.getName());
+	}
+
+	@Override
+	public void start() {
+		logger.info("Source Starting..");
+		watchDirs = new HashSet<WatchDir>();
+		counter.start();
+
+		try {
+			for (String path : dirs) {
+				WatchDir watchDir = new WatchDir(FileSystems.getDefault()
+						.getPath(path), this, timeToUnlockFile, counter);
+				watchDir.proccesEvents();
+				watchDirs.add(watchDir);
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
+		super.start();
+	}
+
+	@Override
+	public void stop() {
+		super.stop();
+		counter.stop();
+		logger.info("DirectoryTailSource {} stopped. Metrics: {}", getName(),
+				counter);
+		for (WatchDir watchDir : watchDirs) {
+			watchDir.stop();
+		}
+	}
 }
