@@ -25,7 +25,7 @@ Configuration
 | ------------- | :-----: | :---------- |
 | Channels | - |  |
 | Type | - | org.apache.flume.source.taildirectory.DirectoryTailSource |
-| dirs | - | Nick of directories, it's such as list of what directories are monitored |
+| dirs | - | NICK of directories, it's such as list of what directories are monitored |
 | dirs.NICK.path | - | Directory path |
 | unlockFileTime | 1 | Delay to check not modified files to unlock the access to them ( in minutes )
 
@@ -35,6 +35,7 @@ agent.sources = tailDir
 agent.sources.tailDir.type = org.apache.flume.source.taildirectory.DirectoryTailSource
 agent.sources.tailDir.dirs = tmpDir varLogDir
 agent.sources.tailDir.dirs.tmpDir.path = /tmp
+agent.sources.taildir.dirs.tmpDir.unlockFileTime = 1
 agent.sources.taildir.dirs.varLogDir.path = /var/log
 agent.sources.taildir.dirs.varLogDir.unlockFileTime = 1
 ```
