@@ -12,7 +12,7 @@ public class DirectoryTailSourceCounter extends MonitoredCounterGroup implements
 	private long startTime;
 
 	private static final String COUNTER_MESSAGE_SENT = "source.counter.message.sent";
-	private static final String COUNTER_MESSAGE_SENT_ERROR = "source.counter.message.sent";
+	private static final String COUNTER_MESSAGE_SENT_ERROR = "source.counter.message.sent.error";
 	private static final String AVERAGE_THROUGHPUT = "source.average.throughput";
 	private static final String CURRENT_THROUGHPUT = "source.current.throughput";
 
@@ -67,17 +67,19 @@ public class DirectoryTailSourceCounter extends MonitoredCounterGroup implements
 		@Override
 		public void run() {
 			currentMessages = get(COUNTER_MESSAGE_SENT);
-			previousMessages = currentMessages;
-			currentThroughput = currentMessages - previousMessages;
-			set(CURRENT_THROUGHPUT, currentThroughput);
+			if (currentMessages >= previousMessages) {
+				currentThroughput = currentMessages - previousMessages;
 
-			currentTime = System.currentTimeMillis() / 1000;
+				set(CURRENT_THROUGHPUT, currentThroughput);
+				currentTime = System.currentTimeMillis() / 1000;
 
-			if (currentTime > startTime) {
-				averageThroughput = currentMessages
-						/ ((currentTime - startTime));
-			}
-			set(AVERAGE_THROUGHPUT, averageThroughput);
+				if (currentTime > startTime) {
+					averageThroughput = currentMessages
+							/ ((currentTime - startTime));
+				}
+				set(AVERAGE_THROUGHPUT, averageThroughput);
+				previousMessages = currentMessages;
+			}	
 		}
 	}
 }
