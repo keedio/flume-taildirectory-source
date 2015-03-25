@@ -119,6 +119,7 @@ public class WatchDir {
 
 		keys.put(key, dir);
 
+		/*
 		File folder = dir.toFile();
 
 		for (final File fileEntry : folder.listFiles()) {
@@ -127,7 +128,7 @@ public class WatchDir {
 			} else {
 				logger.warn("FileEntry found as directory --> TODO: debug this case");
 			}
-		}
+		}*/
 	}
 
 	/**
@@ -157,7 +158,7 @@ public class WatchDir {
 		if (Files.isDirectory(path, NOFOLLOW_LINKS))
 			registerAll(path);
 		else {
-			addFileSetToMap(path, "begin");
+			addFileSetToMap(path, "end");
 		}
 	}
 
