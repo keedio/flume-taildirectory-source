@@ -87,7 +87,7 @@ public class DirectoryTailSource extends AbstractSource implements
 			for (String path : dirs) {
 				WatchDir watchDir = new WatchDir(FileSystems.getDefault()
 						.getPath(path), this, timeToUnlockFile, counter);
-				watchDir.proccesEvents();
+				//watchDir.proccesEvents();
 				watchDirs.add(watchDir);
 			}
 		} catch (IOException e) {
@@ -99,12 +99,12 @@ public class DirectoryTailSource extends AbstractSource implements
 
 	@Override
 	public void stop() {
-		super.stop();
 		counter.stop();
 		logger.info("DirectoryTailSource {} stopped. Metrics: {}", getName(),
 				counter);
 		for (WatchDir watchDir : watchDirs) {
 			watchDir.stop();
 		}
+		super.stop();
 	}
 }

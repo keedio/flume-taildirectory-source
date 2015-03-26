@@ -42,30 +42,34 @@ public class FileSet {
 	private Map<String, String> headers;
 	private long lastAppendTime;
 	private Path filePath;
+	private boolean fileIsOpen;
+	private File file;
 
 	public FileSet(Path filePath, String startFrom) throws IOException {
 
 		this.bufferList = new ArrayList<String>();
+		this.headers = new HashMap<String, String>();
 		this.lastAppendTime = System.currentTimeMillis();
 		this.filePath = filePath;
 
-		File f = new File(filePath.toString());
-
-		rReader = new RandomAccessFile(f, "r");
-
-		if (startFrom.equals("begin")) {
-			rReader.seek(0);
-		} else if (startFrom.equals("end")) {
-			rReader.seek(f.length());
-		} else if (startFrom.equals("lastLine")) {
-			seekToLastLine(rReader);
+		file = new File(filePath.toString());
+		
+		if (startFrom.equals("end")){
+			fileIsOpen = false;
 		}
-
-		logger.debug("File length --> " + f.length());
-		logger.debug("File pointer --> " + rReader.getFilePointer());
-
-		headers = new HashMap<String, String>();
-		logger.debug("FileSet has been created " + filePath);
+		else{
+			rReader = new RandomAccessFile(file, "r");
+			fileIsOpen = true;
+			if (startFrom.equals("begin")) {
+				rReader.seek(0);
+			} else if (startFrom.equals("lastLine")) {
+				seekToLastLine(rReader);
+			}
+	
+			logger.debug("File length --> " + file.length());
+			logger.debug("File pointer --> " + rReader.getFilePointer());
+			logger.debug("FileSet has been created " + filePath);
+		}
 	}
 
 	// This method is use to avoid lost last line log
@@ -144,6 +148,10 @@ public class FileSet {
 		headers.clear();
 	}
 
+	public boolean isFileIsOpen() {
+		return fileIsOpen;
+	}
+
 	public Map<String, String> getHeaders() {
 		return headers;
 	}
@@ -174,9 +182,21 @@ public class FileSet {
 
 	public void close() throws IOException {
 		rReader.close();
+		fileIsOpen=false;
+	}
+	
+	public void open() throws IOException {
+		rReader = new RandomAccessFile(file, "r"); 
+		seekToLastLine(rReader);
+		fileIsOpen=true;
 	}
 
 	public Path getFilePath() {
 		return filePath;
+	}
+	
+	public void setFilePath(Path path) {
+		filePath=path;
+		file = new File(path.toString());
 	}
 }
