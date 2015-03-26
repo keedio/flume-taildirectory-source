@@ -11,7 +11,7 @@ public class FileSetMap extends HashMap<String, FileSet> {
 	
 	private static final long serialVersionUID = 1L;
 
-	private static final Logger logger = LoggerFactory
+	private static final Logger LOGGER = LoggerFactory
 			.getLogger(FileSetMap.class);
 	
 	private HashMap<String, String> filePathsAndKeys;
@@ -39,7 +39,7 @@ public class FileSetMap extends HashMap<String, FileSet> {
 		String fileKey = FileKeys.getFileKey(path);
 
 		if (!this.containsKey(fileKey)) {
-			logger.info("Scanning file: " + path.toString() + " with key: "
+			LOGGER.info("Scanning file: " + path.toString() + " with key: "
 					+ fileKey);
 				fileSet = new FileSet(path, startFrom);
 				filePathsAndKeys.put(path.toString(), fileKey);
@@ -50,10 +50,6 @@ public class FileSetMap extends HashMap<String, FileSet> {
 			if (!fileSet.getFilePath().toString().equals(path.toString())){
 				fileSet.setFilePath(path);
 			}
-			/*
-			if (!fileSet.isFileIsOpen()){
-				fileSet.open();
-			}*/
 		}
 		return fileSet;
 	}

@@ -39,7 +39,7 @@ public class DirectoryTailSource extends AbstractSource implements
 	private static final String CONFIG_PATH = "path";
 	private static final String UNLOCK_TIME = "unlockFileTime";
 
-	private static final Logger logger = LoggerFactory
+	private static final Logger LOGGER = LoggerFactory
 			.getLogger(DirectoryTailSource.class);
 	private String confDirs;
 	private Set<String> dirs;
@@ -48,7 +48,7 @@ public class DirectoryTailSource extends AbstractSource implements
 	private DirectoryTailSourceCounter counter;
 
 	public void configure(Context context) {
-		logger.info("Source Configuring..");
+		LOGGER.info("Source Configuring..");
 
 		confDirs = context.getString(CONFIG_DIRS).trim();
 		Preconditions.checkState(confDirs != null,
@@ -67,7 +67,7 @@ public class DirectoryTailSource extends AbstractSource implements
 					+ "." + CONFIG_PATH);
 			dirs.add(path);
 			if (path == null) {
-				logger.warn("Configuration is empty : " + CONFIG_DIRS + "."
+				LOGGER.warn("Configuration is empty : " + CONFIG_DIRS + "."
 						+ confDirArr[i] + "." + CONFIG_PATH);
 				continue;
 			}
@@ -79,7 +79,7 @@ public class DirectoryTailSource extends AbstractSource implements
 
 	@Override
 	public void start() {
-		logger.info("Source Starting..");
+		LOGGER.info("Source Starting..");
 		watchDirs = new HashSet<WatchDir>();
 		counter.start();
 
@@ -87,11 +87,10 @@ public class DirectoryTailSource extends AbstractSource implements
 			for (String path : dirs) {
 				WatchDir watchDir = new WatchDir(FileSystems.getDefault()
 						.getPath(path), this, timeToUnlockFile, counter);
-				//watchDir.proccesEvents();
 				watchDirs.add(watchDir);
 			}
 		} catch (IOException e) {
-			logger.error(e.getMessage(),e);
+			LOGGER.error(e.getMessage(),e);
 		}
 
 		super.start();
@@ -100,7 +99,7 @@ public class DirectoryTailSource extends AbstractSource implements
 	@Override
 	public void stop() {
 		counter.stop();
-		logger.info("DirectoryTailSource {} stopped. Metrics: {}", getName(),
+		LOGGER.info("DirectoryTailSource {} stopped. Metrics: {}", getName(),
 				counter);
 		for (WatchDir watchDir : watchDirs) {
 			watchDir.stop();

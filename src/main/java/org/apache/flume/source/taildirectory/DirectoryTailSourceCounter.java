@@ -19,7 +19,7 @@ public class DirectoryTailSourceCounter extends MonitoredCounterGroup implements
 	private final ScheduledExecutorService scheduler = Executors
 			.newScheduledThreadPool(1);
 
-	public static final String[] ATTRIBUTES = { COUNTER_MESSAGE_SENT,
+	private static final String[] ATTRIBUTES = { COUNTER_MESSAGE_SENT,
 			COUNTER_MESSAGE_SENT_ERROR, CURRENT_THROUGHPUT, AVERAGE_THROUGHPUT };
 
 	public DirectoryTailSourceCounter(String name) {
@@ -31,7 +31,7 @@ public class DirectoryTailSourceCounter extends MonitoredCounterGroup implements
 		scheduler.scheduleAtFixedRate(runnableThroughput, 0, 1,
 				TimeUnit.SECONDS);
 	}
-
+	
 	public void increaseCounterMessageSent() {
 		increment(COUNTER_MESSAGE_SENT);
 	}

@@ -29,12 +29,11 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.flume.Transaction;
-//import org.apache.flume.source.AbstractSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class FileSet {
-	private static final Logger logger = LoggerFactory.getLogger(FileSet.class);
+	private static final Logger LOGGER = LoggerFactory.getLogger(FileSet.class);
 	private BufferedReader bufferedReader;
 	private RandomAccessFile rReader;
 	private Transaction transaction;
@@ -66,9 +65,9 @@ public class FileSet {
 				seekToLastLine(rReader);
 			}
 	
-			logger.debug("File length --> " + file.length());
-			logger.debug("File pointer --> " + rReader.getFilePointer());
-			logger.debug("FileSet has been created " + filePath);
+			LOGGER.debug("File length --> " + file.length());
+			LOGGER.debug("File pointer --> " + rReader.getFilePointer());
+			LOGGER.debug("FileSet has been created " + filePath);
 		}
 	}
 
@@ -88,11 +87,9 @@ public class FileSet {
 					posReached = true;
 					rReader.seek(filePointer);
 				}
-			} else if (readByte == 0xD) {
-				if (filePointer != fileLength - 1) {
-					posReached = true;
-					rReader.seek(filePointer);
-				}
+			} else if (readByte == 0xD && filePointer != fileLength - 1) {
+				posReached = true;
+				rReader.seek(filePointer);
 			}
 
 			filePointer--;

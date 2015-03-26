@@ -19,10 +19,6 @@ import org.apache.flume.source.AbstractSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * 
- */
-
 public class WatchDir {
 
 	private final WatchService watcher;
@@ -32,7 +28,7 @@ public class WatchDir {
 	private HashMap<String, String> filePathsAndKeys;
 	private long timeToUnlockFile;
 
-	private static final Logger logger = LoggerFactory
+	private static final Logger LOGGER= LoggerFactory
 			.getLogger(WatchDir.class);
 
 	private final ScheduledExecutorService scheduler = Executors
@@ -51,7 +47,7 @@ public class WatchDir {
 	WatchDir(Path dir, AbstractSource source, long timeToUnlockFile,
 			DirectoryTailSourceCounter counter) throws IOException {
 
-		logger.trace("WatchDir: WatchDir");
+		LOGGER.trace("WatchDir: WatchDir");
 
 		this.timeToUnlockFile = timeToUnlockFile;
 		this.counter = counter;
@@ -64,7 +60,7 @@ public class WatchDir {
 		this.filePathsAndKeys = new HashMap<String, String>();
 		this.fileSetMap = new FileSetMap(filePathsAndKeys);
 
-		logger.info("Scanning directory: " + dir);
+		LOGGER.info("Scanning directory: " + dir);
 		registerAll(dir);
 		
 		Thread t = new Thread(new WatchDirRunnable());
@@ -84,7 +80,7 @@ public class WatchDir {
 	 */
 	private void registerAll(final Path start) throws IOException {
 
-		logger.trace("WatchDir: registerAll");
+		LOGGER.trace("WatchDir: registerAll");
 
 		// register directory and sub-directories
 		Files.walkFileTree(start, new SimpleFileVisitor<Path>() {
@@ -102,19 +98,19 @@ public class WatchDir {
 	 */
 	private void register(Path dir) throws IOException {
 
-		logger.trace("WatchDir: register");
+		LOGGER.trace("WatchDir: register");
 
 		WatchKey key = dir.register(watcher, ENTRY_CREATE, ENTRY_DELETE,
 				ENTRY_MODIFY);
 		Path prev = keys.get(key);
 
 		// TODO: Change this log lines, are not descriptive
-		logger.info("prev: " + prev);
+		LOGGER.info("prev: " + prev);
 		if (prev == null) {
-			logger.info("register: " + dir);
+			LOGGER.info("register: " + dir);
 		} else {
 			if (!dir.equals(prev)) {
-				logger.info("update: " + "-> " + prev + " " + dir);
+				LOGGER.info("update: " + "-> " + prev + " " + dir);
 			}
 		}
 
@@ -127,7 +123,7 @@ public class WatchDir {
 			if (!fileEntry.isDirectory()) {
 				fileSetMap.addFileSetToMap(fileEntry.toPath(), "end");
 			} else {
-				logger.warn("FileEntry found as directory --> TODO: debug this case");
+				LOGGER.warn("FileEntry found as directory --> TODO: debug this case");
 			}
 		}
 	}
@@ -135,7 +131,7 @@ public class WatchDir {
 	private void fileCreated(Path path) throws IOException,
 			InterruptedException {
 
-		logger.trace("WatchDir: fileCreated");
+		LOGGER.trace("WatchDir: fileCreated");
 
 		if (Files.isDirectory(path, NOFOLLOW_LINKS))
 			registerAll(path);
@@ -146,7 +142,7 @@ public class WatchDir {
 			if (fileSet.isFileIsOpen()){
 				while ((buffer = fileSet.readLine()) != null) {
 					if (buffer.length() == 0) {
-						logger.debug("Readed empty line");
+						LOGGER.debug("Readed empty line");
 						continue;
 					} else {
 						fileSet.appendLine(buffer);
@@ -166,7 +162,7 @@ public class WatchDir {
 
 	private void fileModified(Path path) throws IOException {
 
-		logger.trace("WatchDir: fileModified");
+		LOGGER.trace("WatchDir: fileModified");
 
 		String buffer;
 		FileSet fileSet = fileSetMap.getFileSet(path);
@@ -176,7 +172,7 @@ public class WatchDir {
 
 		while ((buffer = fileSet.readLine()) != null) {
 			if (buffer.length() == 0) {
-				logger.debug("Readed empty line");
+				LOGGER.debug("Readed empty line");
 				continue;
 			} else {
 				fileSet.appendLine(buffer);
@@ -189,7 +185,7 @@ public class WatchDir {
 	}
 
 	private void fileDeleted(Path path) throws IOException {
-		logger.trace("WatchDir: fileDeleted");
+		LOGGER.trace("WatchDir: fileDeleted");
 
 		String fileKey = FileKeys.getFileKey(path);
 		
@@ -212,7 +208,7 @@ public class WatchDir {
 
 	private void sendEvent(FileSet fileSet) {
 
-		logger.trace("WatchDir: sendEvent");
+		LOGGER.trace("WatchDir: sendEvent");
 
 		if (fileSet.getBufferList().isEmpty())
 			return;
@@ -228,15 +224,15 @@ public class WatchDir {
 
 	public void stop() {
 
-		logger.trace("WatchDir: stop");
+		LOGGER.trace("WatchDir: stop");
 		try {
 			for (FileSet fileSet : fileSetMap.values()) {
-				logger.debug("Closing file: " + fileSet.getFilePath());
+				LOGGER.debug("Closing file: " + fileSet.getFilePath());
 				fileSet.clear();
 				fileSet.close();
 			}
 		} catch (IOException x) {
-			logger.error(x.getMessage(),x);
+			LOGGER.error(x.getMessage(),x);
 		}
 	}
 
@@ -259,18 +255,18 @@ public class WatchDir {
 						lastAppendTime = fileSet.getLastAppendTime();
 						currentTime = System.currentTimeMillis();
 						
-						logger.trace("FILE: {}",fileSet.getFilePath());
+						LOGGER.trace("FILE: {}",fileSet.getFilePath());
 						
 						Date expiry = new Date(lastAppendTime);
-						logger.trace("LAST APPEND TIME {}", expiry);
+						LOGGER.trace("LAST APPEND TIME {}", expiry);
 						expiry = new Date(currentTime);
-						logger.trace("CURRENT TIME {}", currentTime);
+						LOGGER.trace("CURRENT TIME {}", currentTime);
 						
-						logger.debug("Checking file: " + fileSet.getFilePath());
+						LOGGER.debug("Checking file: " + fileSet.getFilePath());
 	
 						if (currentTime - lastAppendTime > TimeUnit.MINUTES
 								.toMillis(timeToUnlockFile)) {
-							logger.info("File: " + fileSet.getFilePath()
+							LOGGER.info("File: " + fileSet.getFilePath()
 									+ " not modified after " + timeToUnlockFile
 									+ " minutes" + " closing file");
 							fileSetMap.get(fileKey).clear();
@@ -279,7 +275,7 @@ public class WatchDir {
 					}
 				}
 			} catch (IOException e) {
-				logger.error(e.getMessage(),e);
+				LOGGER.error(e.getMessage(),e);
 			}
 		}
 	}
@@ -288,7 +284,7 @@ public class WatchDir {
 
 		@Override
 		public void run() {
-			logger.debug("Current throughput: "
+			LOGGER.debug("Current throughput: "
 					+ counter.getCurrentThroughput());
 		}
 
@@ -306,7 +302,7 @@ public class WatchDir {
 					Path dir = keys.get(key);
 
 					if (dir == null) {
-						logger.error("WatchKey not recognized!!");
+						LOGGER.error("WatchKey not recognized!!");
 						continue;
 					}
 
@@ -320,7 +316,7 @@ public class WatchDir {
 						Path path = dir.resolve(name);
 
 						// print out event
-						logger.trace(event.kind().name() + ": " + path);
+						LOGGER.trace(event.kind().name() + ": " + path);
 
 						if (kind == ENTRY_MODIFY) {
 							fileModified(path);
@@ -343,7 +339,7 @@ public class WatchDir {
 					}
 				}
 			} catch (Exception x) {
-				logger.error(x.getMessage(), x);
+				LOGGER.error(x.getMessage(), x);
 			}
 		}
 
