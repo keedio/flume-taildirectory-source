@@ -29,12 +29,11 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.flume.Transaction;
-//import org.apache.flume.source.AbstractSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class FileSet {
-	private static final Logger logger = LoggerFactory.getLogger(FileSet.class);
+	private static final Logger LOGGER = LoggerFactory.getLogger(FileSet.class);
 	private BufferedReader bufferedReader;
 	private RandomAccessFile rReader;
 	private Transaction transaction;
@@ -42,30 +41,33 @@ public class FileSet {
 	private Map<String, String> headers;
 	private long lastAppendTime;
 	private Path filePath;
+	private boolean fileIsOpen;
+	private File file;
 
 	public FileSet(Path filePath, String startFrom) throws IOException {
 
 		this.bufferList = new ArrayList<String>();
+		this.headers = new HashMap<String, String>();
 		this.lastAppendTime = System.currentTimeMillis();
 		this.filePath = filePath;
 
-		File f = new File(filePath.toString());
+		file = new File(filePath.toString());
 
-		rReader = new RandomAccessFile(f, "r");
+		if ("end".equals(startFrom)) {
+			fileIsOpen = false;
+		} else {
+			rReader = new RandomAccessFile(file, "r");
+			fileIsOpen = true;
+			if ("begin".equals(startFrom)) {
+				rReader.seek(0);
+			} else if ("lastLine".equals(startFrom)) {
+				seekToLastLine(rReader);
+			}
 
-		if (startFrom.equals("begin")) {
-			rReader.seek(0);
-		} else if (startFrom.equals("end")) {
-			rReader.seek(f.length());
-		} else if (startFrom.equals("lastLine")) {
-			seekToLastLine(rReader);
+			LOGGER.debug("File length --> " + file.length());
+			LOGGER.debug("File pointer --> " + rReader.getFilePointer());
+			LOGGER.debug("FileSet has been created " + filePath);
 		}
-
-		logger.debug("File length --> " + f.length());
-		logger.debug("File pointer --> " + rReader.getFilePointer());
-
-		headers = new HashMap<String, String>();
-		logger.debug("FileSet has been created " + filePath);
 	}
 
 	// This method is use to avoid lost last line log
@@ -84,11 +86,9 @@ public class FileSet {
 					posReached = true;
 					rReader.seek(filePointer);
 				}
-			} else if (readByte == 0xD) {
-				if (filePointer != fileLength - 1) {
-					posReached = true;
-					rReader.seek(filePointer);
-				}
+			} else if (readByte == 0xD && filePointer != fileLength - 1) {
+				posReached = true;
+				rReader.seek(filePointer);
 			}
 
 			filePointer--;
@@ -120,9 +120,9 @@ public class FileSet {
 		return bufferList.size();
 	}
 
-	public StringBuffer getAllLines() {
+	public StringBuilder getAllLines() {
 
-		StringBuffer sb = new StringBuffer();
+		StringBuilder sb = new StringBuilder();
 
 		for (int i = 0; i < bufferList.size(); i++) {
 			sb.append(bufferList.get(i));
@@ -142,6 +142,10 @@ public class FileSet {
 	public void clear() {
 		bufferList.clear();
 		headers.clear();
+	}
+
+	public boolean isFileIsOpen() {
+		return fileIsOpen;
 	}
 
 	public Map<String, String> getHeaders() {
@@ -174,9 +178,21 @@ public class FileSet {
 
 	public void close() throws IOException {
 		rReader.close();
+		fileIsOpen = false;
+	}
+
+	public void open() throws IOException {
+		rReader = new RandomAccessFile(file, "r");
+		seekToLastLine(rReader);
+		fileIsOpen = true;
 	}
 
 	public Path getFilePath() {
 		return filePath;
+	}
+
+	public void setFilePath(Path path) {
+		filePath = path;
+		file = new File(path.toString());
 	}
 }

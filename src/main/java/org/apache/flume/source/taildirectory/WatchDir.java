@@ -19,32 +19,22 @@ import org.apache.flume.source.AbstractSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * 
- */
-
 public class WatchDir {
 
 	private final WatchService watcher;
 	private final Map<WatchKey, Path> keys;
 	private AbstractSource source;
-	private HashMap<String, FileSet> fileSetMap;
-	private HashMap<String, String> filePathsAndKeys;
+	private FileSetMap fileSetMap;
+	private Map<String, String> filePathsAndKeys;
 	private long timeToUnlockFile;
 
-	private static final Logger logger = LoggerFactory
+	private static final Logger LOGGER= LoggerFactory
 			.getLogger(WatchDir.class);
-	private String OS;
 
 	private final ScheduledExecutorService scheduler = Executors
 			.newScheduledThreadPool(2);
 
 	private DirectoryTailSourceCounter counter;
-
-	@SuppressWarnings("unchecked")
-	static <T> WatchEvent<T> cast(WatchEvent<?> event) {
-		return (WatchEvent<T>) event;
-	}
 
 	/**
 	 * Creates a WatchService and registers the given directory
@@ -52,7 +42,7 @@ public class WatchDir {
 	WatchDir(Path dir, AbstractSource source, long timeToUnlockFile,
 			DirectoryTailSourceCounter counter) throws IOException {
 
-		logger.trace("WatchDir: WatchDir");
+		LOGGER.trace("WatchDir: WatchDir");
 
 		this.timeToUnlockFile = timeToUnlockFile;
 		this.counter = counter;
@@ -63,13 +53,13 @@ public class WatchDir {
 		this.keys = new HashMap<WatchKey, Path>();
 
 		this.filePathsAndKeys = new HashMap<String, String>();
-		this.fileSetMap = new HashMap<String, FileSet>();
+		this.fileSetMap = new FileSetMap(filePathsAndKeys);
 
-		this.OS = getOSType();
-
-		logger.info("Scanning directory: " + dir);
+		LOGGER.info("Scanning directory: " + dir);
 		registerAll(dir);
-		logger.info("Done.");
+		
+		Thread t = new Thread(new WatchDirRunnable());
+		t.start();
 
 		final Runnable lastAppend = new CheckLastTimeModified();
 		scheduler.scheduleAtFixedRate(lastAppend, 0, 1, TimeUnit.MINUTES);
@@ -77,57 +67,10 @@ public class WatchDir {
 		final Runnable printThroughput = new PrintThroughput();
 		scheduler.scheduleAtFixedRate(printThroughput, 0, 5, TimeUnit.SECONDS);
 	}
-
-	private String getOSType() {
-		String osName = System.getProperty("os.name").toLowerCase();
-
-		if (osName.indexOf("win") >= 0)
-			OS = "win";
-		else if (osName.indexOf("nix") >= 0 || osName.indexOf("nux") >= 0
-				|| osName.indexOf("aix") > 0)
-			OS = "unix";
-		else if (OS.indexOf("mac") >= 0)
-			OS = "mac";
-		else if (OS.indexOf("sunos") >= 0)
-			OS = "solaris";
-		else
-			OS = "unknown";
-
-		return OS;
-	}
-
-	/**
-	 * Register the given directory with the WatchService
-	 */
-	private void register(Path dir) throws IOException {
-
-		logger.trace("WatchDir: register");
-
-		WatchKey key = dir.register(watcher, ENTRY_CREATE, ENTRY_DELETE,
-				ENTRY_MODIFY);
-		Path prev = keys.get(key);
-
-		// TODO: Change this log lines, are not descriptive
-		logger.info("prev: " + prev);
-		if (prev == null) {
-			logger.info("register: " + dir);
-		} else {
-			if (!dir.equals(prev)) {
-				logger.info("update: " + "-> " + prev + " " + dir);
-			}
-		}
-
-		keys.put(key, dir);
-
-		File folder = dir.toFile();
-
-		for (final File fileEntry : folder.listFiles()) {
-			if (!fileEntry.isDirectory()) {
-				addFileSetToMap(fileEntry.toPath(), "end");
-			} else {
-				logger.warn("FileEntry found as directory --> TODO: debug this case");
-			}
-		}
+	
+	@SuppressWarnings("unchecked")
+	static <T> WatchEvent<T> cast(WatchEvent<?> event) {
+		return (WatchEvent<T>) event;
 	}
 
 	/**
@@ -136,7 +79,7 @@ public class WatchDir {
 	 */
 	private void registerAll(final Path start) throws IOException {
 
-		logger.trace("WatchDir: registerAll");
+		LOGGER.trace("WatchDir: registerAll");
 
 		// register directory and sub-directories
 		Files.walkFileTree(start, new SimpleFileVisitor<Path>() {
@@ -149,28 +92,45 @@ public class WatchDir {
 		});
 	}
 
-	private void fileCreated(Path path) throws IOException,
-			InterruptedException {
+	/**
+	 * Register the given directory with the WatchService
+	 */
+	private void register(Path dir) throws IOException {
 
-		logger.trace("WatchDir: fileCreated");
+		LOGGER.trace("WatchDir: register");
 
-		if (Files.isDirectory(path, NOFOLLOW_LINKS))
-			registerAll(path);
-		else {
-			addFileSetToMap(path, "begin");
+		WatchKey key = dir.register(watcher, ENTRY_CREATE, ENTRY_DELETE,
+				ENTRY_MODIFY);
+		Path prev = keys.get(key);
+
+		LOGGER.info("Previous directory: " + prev);
+		if (prev == null) {
+			LOGGER.info("Registering directory: " + dir);
+		} else {
+			if (!dir.equals(prev)) {
+				LOGGER.info("Updating previous directory: " + "-> " + prev + " to " + dir);
+			}
+		}
+
+		keys.put(key, dir);
+
+		
+		File folder = dir.toFile();
+
+		for (final File fileEntry : folder.listFiles()) {
+			if (!fileEntry.isDirectory()) {
+				fileSetMap.addFileSetToMap(fileEntry.toPath(), "end");
+			} else {
+				LOGGER.warn("FileEntry found as directory --> TODO: debug this case");
+			}
 		}
 	}
-
-	private void fileModified(Path path) throws IOException {
-
-		logger.trace("WatchDir: fileModified");
-
+	
+	private void readLines(FileSet fileSet) throws IOException{
 		String buffer;
-		FileSet fileSet = getFileSet(path);
-
 		while ((buffer = fileSet.readLine()) != null) {
 			if (buffer.length() == 0) {
-				logger.debug("Readed empty line");
+				LOGGER.debug("Readed empty line");
 				continue;
 			} else {
 				fileSet.appendLine(buffer);
@@ -182,81 +142,47 @@ public class WatchDir {
 		}
 	}
 
-	private FileSet getFileSet(Path path) throws IOException {
+	private void fileCreated(Path path) throws IOException{
 
-		logger.trace("WatchDir: getFileSet");
+		LOGGER.trace("WatchDir: fileCreated");
 
-		FileSet fileSet;
-		String fileKey;
-
-		if (OS == "win")
-			fileKey = path.toString();
-		else
-			fileKey = Files.readAttributes(path, BasicFileAttributes.class)
-					.fileKey().toString();
-
-		if (fileSetMap.containsKey(fileKey)) {
-			fileSet = fileSetMap.get(fileKey);
-		} else {
-			fileSet = addFileSetToMap(path, "lastLine");
-		}
-
-		return fileSet;
+		if (Files.isDirectory(path, NOFOLLOW_LINKS))
+			registerAll(path);
+		else {	
+			FileSet fileSet = fileSetMap.addFileSetToMap(path, "begin");
+			if (fileSet.isFileIsOpen())
+				readLines(fileSet);		
+		}	
 	}
 
-	private FileSet addFileSetToMap(Path path, String startFrom)
-			throws IOException {
+	private void fileModified(Path path) throws IOException {
 
-		logger.trace("WatchDir: addFileSetToMap");
+		LOGGER.trace("WatchDir: fileModified");
 
-		String fileKey;
-		FileSet fileSet;
+		FileSet fileSet = fileSetMap.getFileSet(path);
+		
+		if (!fileSet.isFileIsOpen())
+			fileSet.open();
 
-		if (OS == "win")
-			fileKey = path.toString();
-		else
-			fileKey = Files.readAttributes(path, BasicFileAttributes.class)
-					.fileKey().toString();
-
-		if (!fileSetMap.containsKey(fileKey)) {
-			logger.info("Scanning file: " + path.toString() + " with key: "
-					+ fileKey);
-
-			synchronized (fileSetMap) {
-				fileSet = new FileSet(path, startFrom);
-				filePathsAndKeys.put(path.toString(), fileKey);
-				fileSetMap.put(fileKey, fileSet);
-			}
-		} else
-			fileSet = fileSetMap.get(fileKey);
-
-		return fileSet;
+		readLines(fileSet);	
 	}
 
 	private void fileDeleted(Path path) throws IOException {
-		logger.trace("WatchDir: fileDeleted");
+		LOGGER.trace("WatchDir: fileDeleted");
 
-		String fileKey = null;
-
-		if (OS == "win") {
-			fileKey = path.toString();
-		} else {
-			if (filePathsAndKeys.containsKey(path.toString())) {
-				fileKey = filePathsAndKeys.get(path.toString());
-			} else
-				logger.error("File key of file " + path.toString()
-						+ " not found in filePathsAndKeys hashMap");
+		String fileKey = FileKeys.getFileKey(path);
+		
+		if (fileKey == null){
+			fileKey = filePathsAndKeys.get(path.toString());
 		}
 
 		if (fileKey != null) {
-			logger.info("Removing file: " + path + " with key: " + fileKey);
-			synchronized (fileSetMap) {
-				if (fileSetMap.containsKey(fileKey)) {
-					fileSetMap.get(fileKey).clear();
-					fileSetMap.get(fileKey).close();
-					fileSetMap.remove(fileKey);
-				}
+			FileSet fileSet = fileSetMap.get(fileKey);
+			if (fileSet.isFileIsOpen()){
+				fileSet.clear();
+				fileSet.close();
 			}
+
 			if (filePathsAndKeys.containsKey(path.toString())) {
 				filePathsAndKeys.remove(path.toString());
 			}
@@ -265,12 +191,12 @@ public class WatchDir {
 
 	private void sendEvent(FileSet fileSet) {
 
-		logger.trace("WatchDir: sendEvent");
+		LOGGER.trace("WatchDir: sendEvent");
 
 		if (fileSet.getBufferList().isEmpty())
 			return;
 
-		StringBuffer sb = fileSet.getAllLines();
+		StringBuilder sb = fileSet.getAllLines();
 		Event event = EventBuilder.withBody(String.valueOf(sb).getBytes(),
 				fileSet.getHeaders());
 		source.getChannelProcessor().processEvent(event);
@@ -279,73 +205,17 @@ public class WatchDir {
 		fileSet.clear();
 	}
 
-	public void proccesEvents() {
-		logger.trace("WatchDir: run");
-
-		try {
-			for (;;) {
-
-				// wait for key to be signaled
-				WatchKey key;
-				key = watcher.take();
-				Path dir = keys.get(key);
-
-				if (dir == null) {
-					logger.error("WatchKey not recognized!!");
-					continue;
-				}
-
-				for (WatchEvent<?> event : key.pollEvents()) {
-					Kind<?> kind = event.kind();
-
-					// Context for directory entry event is the file name of
-					// entry
-					WatchEvent<Path> ev = cast(event);
-					Path name = ev.context();
-					Path path = dir.resolve(name);
-
-					// print out event
-					logger.trace(event.kind().name() + ": " + path);
-
-					if (kind == ENTRY_MODIFY) {
-						fileModified(path);
-					} else if (kind == ENTRY_CREATE) {
-						fileCreated(path);
-					} else if (kind == ENTRY_DELETE) {
-						fileDeleted(path);
-					}
-				}
-
-				// reset key and remove from set if directory no longer
-				// accessible
-				boolean valid = key.reset();
-				if (!valid) {
-					keys.remove(key);
-					// all directories are inaccessible
-					if (keys.isEmpty()) {
-						break;
-					}
-				}
-			}
-		} catch (IOException x) {
-			x.printStackTrace();
-		} catch (InterruptedException x) {
-			x.printStackTrace();
-			return;
-		}
-	}
-
 	public void stop() {
 
-		logger.trace("WatchDir: stop");
+		LOGGER.trace("WatchDir: stop");
 		try {
 			for (FileSet fileSet : fileSetMap.values()) {
-				logger.debug("Closing file: " + fileSet.getFilePath());
+				LOGGER.debug("Closing file: " + fileSet.getFilePath());
 				fileSet.clear();
 				fileSet.close();
 			}
 		} catch (IOException x) {
-			x.printStackTrace();
+			LOGGER.error(x.getMessage(),x);
 		}
 	}
 
@@ -364,25 +234,31 @@ public class WatchDir {
 				for (String fileKey : fileKeySet) {
 
 					fileSet = fileSetMap.get(fileKey);
-
-					lastAppendTime = fileSet.getLastAppendTime();
-					currentTime = System.currentTimeMillis();
-					logger.debug("Checking file: " + fileSet.getFilePath());
-
-					if (currentTime - lastAppendTime > TimeUnit.MINUTES
-							.toMillis(timeToUnlockFile)) {
-						logger.info("File: " + fileSet.getFilePath()
-								+ " not modified after " + timeToUnlockFile
-								+ " minutes" + " removing from monitoring list");
-						fileSetMap.get(fileKey).clear();
-						fileSetMap.get(fileKey).close();
-						filePathsAndKeys.remove(fileSet.getFilePath()
-								.toString());
-						fileSetMap.remove(fileKey);
+					if (fileSet.isFileIsOpen()){
+						lastAppendTime = fileSet.getLastAppendTime();
+						currentTime = System.currentTimeMillis();
+						
+						LOGGER.trace("FILE: {}",fileSet.getFilePath());
+						
+						Date expiry = new Date(lastAppendTime);
+						LOGGER.trace("LAST APPEND TIME {}", expiry);
+						expiry = new Date(currentTime);
+						LOGGER.trace("CURRENT TIME {}", currentTime);
+						
+						LOGGER.debug("Checking file: " + fileSet.getFilePath());
+	
+						if (currentTime - lastAppendTime > TimeUnit.MINUTES
+								.toMillis(timeToUnlockFile)) {
+							LOGGER.info("File: " + fileSet.getFilePath()
+									+ " not modified after " + timeToUnlockFile
+									+ " minutes" + " closing file");
+							fileSetMap.get(fileKey).clear();
+							fileSetMap.get(fileKey).close();
+						}
 					}
 				}
 			} catch (IOException e) {
-				e.printStackTrace();
+				LOGGER.error(e.getMessage(),e);
 			}
 		}
 	}
@@ -391,8 +267,63 @@ public class WatchDir {
 
 		@Override
 		public void run() {
-			logger.debug("Current throughput: "
+			LOGGER.debug("Current throughput: "
 					+ counter.getCurrentThroughput());
+		}
+
+	}
+	
+	private class WatchDirRunnable implements Runnable {
+
+		@Override
+		public void run() {
+			try {
+				for (;;) {
+					// wait for key to be signaled
+					WatchKey key;
+					key = watcher.take();
+					Path dir = keys.get(key);
+
+					if (dir == null) {
+						LOGGER.error("WatchKey not recognized!!");
+						continue;
+					}
+
+					for (WatchEvent<?> event : key.pollEvents()) {
+						Kind<?> kind = event.kind();
+
+						// Context for directory entry event is the file name of
+						// entry
+						WatchEvent<Path> ev = cast(event);
+						Path name = ev.context();
+						Path path = dir.resolve(name);
+
+						// print out event
+						LOGGER.trace(event.kind().name() + ": " + path);
+
+						if (kind == ENTRY_MODIFY) {
+							fileModified(path);
+						} else if (kind == ENTRY_CREATE) {
+							fileCreated(path);				
+						} else if (kind == ENTRY_DELETE) {
+							fileDeleted(path);
+						}
+					}
+
+					// reset key and remove from set if directory no longer
+					// accessible
+					boolean valid = key.reset();
+					if (!valid) {
+						keys.remove(key);
+						// all directories are inaccessible
+						if (keys.isEmpty()) {
+							break;
+						}
+					}
+				}
+			} catch (Exception x) {
+				LOGGER.error(x.getMessage(), x);
+			}
 		}
 
 	}
