@@ -236,7 +236,7 @@ public class WatchDir {
 				fileSet.close();
 			}
 		} catch (IOException x) {
-			x.printStackTrace();
+			logger.error(x.getMessage(),x);
 		}
 	}
 
@@ -279,8 +279,7 @@ public class WatchDir {
 					}
 				}
 			} catch (IOException e) {
-				logger.error(e.getMessage());
-				e.printStackTrace();
+				logger.error(e.getMessage(),e);
 			}
 		}
 	}
@@ -343,12 +342,8 @@ public class WatchDir {
 						}
 					}
 				}
-			} catch (IOException x) {
+			} catch (Exception x) {
 				logger.error(x.getMessage(), x);
-				x.printStackTrace();
-			} catch (InterruptedException x) {
-				logger.error(x.getMessage());
-				x.printStackTrace();
 			}
 		}
 
