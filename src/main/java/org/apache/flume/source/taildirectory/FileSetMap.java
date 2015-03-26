@@ -9,7 +9,7 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class FileSetMap extends HashMap<String, FileSet> implements Serializable {
+public class FileSetMap extends HashMap<String, FileSet> {
 	
 	private static final long serialVersionUID = 1L;
 
