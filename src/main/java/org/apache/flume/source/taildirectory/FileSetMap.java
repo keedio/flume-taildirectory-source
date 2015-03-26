@@ -1,6 +1,7 @@
 package org.apache.flume.source.taildirectory;
 
 import java.io.IOException;
+import java.io.Serializable;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
@@ -8,7 +9,7 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class FileSetMap extends HashMap<String, FileSet> {
+public class FileSetMap extends HashMap<String, FileSet> implements Serializable {
 	
 	private static final long serialVersionUID = 1L;
 

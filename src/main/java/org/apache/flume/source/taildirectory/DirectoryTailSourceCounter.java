@@ -32,26 +32,32 @@ public class DirectoryTailSourceCounter extends MonitoredCounterGroup implements
 				TimeUnit.SECONDS);
 	}
 
+	@Override
 	public void increaseCounterMessageSent() {
 		increment(COUNTER_MESSAGE_SENT);
 	}
 
+	@Override
 	public long getCounterMessageSent() {
 		return get(COUNTER_MESSAGE_SENT);
 	}
 
+	@Override
 	public void increaseCounterMessageSentError() {
 		increment(COUNTER_MESSAGE_SENT_ERROR);
 	}
 
+	@Override
 	public long getCounterMessageSentError() {
 		return get(COUNTER_MESSAGE_SENT_ERROR);
 	}
 
+	@Override
 	public long getAverageThroughput() {
 		return get(AVERAGE_THROUGHPUT);
 	}
 
+	@Override
 	public long getCurrentThroughput() {
 		return get(CURRENT_THROUGHPUT);
 	}
