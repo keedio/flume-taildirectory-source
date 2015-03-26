@@ -25,7 +25,7 @@ public class WatchDir {
 	private final Map<WatchKey, Path> keys;
 	private AbstractSource source;
 	private FileSetMap fileSetMap;
-	private HashMap<String, String> filePathsAndKeys;
+	private Map<String, String> filePathsAndKeys;
 	private long timeToUnlockFile;
 
 	private static final Logger LOGGER= LoggerFactory
@@ -35,11 +35,6 @@ public class WatchDir {
 			.newScheduledThreadPool(2);
 
 	private DirectoryTailSourceCounter counter;
-
-	@SuppressWarnings("unchecked")
-	static <T> WatchEvent<T> cast(WatchEvent<?> event) {
-		return (WatchEvent<T>) event;
-	}
 
 	/**
 	 * Creates a WatchService and registers the given directory
@@ -73,6 +68,10 @@ public class WatchDir {
 		scheduler.scheduleAtFixedRate(printThroughput, 0, 5, TimeUnit.SECONDS);
 	}
 	
+	@SuppressWarnings("unchecked")
+	static <T> WatchEvent<T> cast(WatchEvent<?> event) {
+		return (WatchEvent<T>) event;
+	}
 
 	/**
 	 * Register the given directory, and all its sub-directories, with the
@@ -104,13 +103,12 @@ public class WatchDir {
 				ENTRY_MODIFY);
 		Path prev = keys.get(key);
 
-		// TODO: Change this log lines, are not descriptive
-		LOGGER.info("prev: " + prev);
+		LOGGER.info("Previous directory: " + prev);
 		if (prev == null) {
-			LOGGER.info("register: " + dir);
+			LOGGER.info("Registering directory: " + dir);
 		} else {
 			if (!dir.equals(prev)) {
-				LOGGER.info("update: " + "-> " + prev + " " + dir);
+				LOGGER.info("Updating previous directory: " + "-> " + prev + " to " + dir);
 			}
 		}
 

@@ -3,6 +3,7 @@ package org.apache.flume.source.taildirectory;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,9 +15,9 @@ public class FileSetMap extends HashMap<String, FileSet> {
 	private static final Logger LOGGER = LoggerFactory
 			.getLogger(FileSetMap.class);
 	
-	private HashMap<String, String> filePathsAndKeys;
+	private Map<String, String> filePathsAndKeys;
 	
-	FileSetMap(HashMap<String, String> filePathsAndKeys){
+	FileSetMap(Map<String, String> filePathsAndKeys){
 		super();
 		this.filePathsAndKeys = filePathsAndKeys;
 	}

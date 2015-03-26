@@ -47,6 +47,7 @@ public class DirectoryTailSource extends AbstractSource implements
 	private long timeToUnlockFile;
 	private DirectoryTailSourceCounter counter;
 
+	@Override
 	public void configure(Context context) {
 		LOGGER.info("Source Configuring..");
 
