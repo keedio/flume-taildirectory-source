@@ -52,19 +52,18 @@ public class FileSet {
 		this.filePath = filePath;
 
 		file = new File(filePath.toString());
-		
-		if (startFrom.equals("end")){
+
+		if ("end".equals(startFrom)) {
 			fileIsOpen = false;
-		}
-		else{
+		} else {
 			rReader = new RandomAccessFile(file, "r");
 			fileIsOpen = true;
-			if (startFrom.equals("begin")) {
+			if ("begin".equals(startFrom)) {
 				rReader.seek(0);
-			} else if (startFrom.equals("lastLine")) {
+			} else if ("lastLine".equals(startFrom)) {
 				seekToLastLine(rReader);
 			}
-	
+
 			LOGGER.debug("File length --> " + file.length());
 			LOGGER.debug("File pointer --> " + rReader.getFilePointer());
 			LOGGER.debug("FileSet has been created " + filePath);
@@ -121,9 +120,9 @@ public class FileSet {
 		return bufferList.size();
 	}
 
-	public StringBuffer getAllLines() {
+	public StringBuilder getAllLines() {
 
-		StringBuffer sb = new StringBuffer();
+		StringBuilder sb = new StringBuilder();
 
 		for (int i = 0; i < bufferList.size(); i++) {
 			sb.append(bufferList.get(i));
@@ -179,21 +178,21 @@ public class FileSet {
 
 	public void close() throws IOException {
 		rReader.close();
-		fileIsOpen=false;
+		fileIsOpen = false;
 	}
-	
+
 	public void open() throws IOException {
-		rReader = new RandomAccessFile(file, "r"); 
+		rReader = new RandomAccessFile(file, "r");
 		seekToLastLine(rReader);
-		fileIsOpen=true;
+		fileIsOpen = true;
 	}
 
 	public Path getFilePath() {
 		return filePath;
 	}
-	
+
 	public void setFilePath(Path path) {
-		filePath=path;
+		filePath = path;
 		file = new File(path.toString());
 	}
 }

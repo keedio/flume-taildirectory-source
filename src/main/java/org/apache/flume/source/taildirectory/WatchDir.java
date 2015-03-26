@@ -127,49 +127,9 @@ public class WatchDir {
 			}
 		}
 	}
-
-	private void fileCreated(Path path) throws IOException,
-			InterruptedException {
-
-		LOGGER.trace("WatchDir: fileCreated");
-
-		if (Files.isDirectory(path, NOFOLLOW_LINKS))
-			registerAll(path);
-		else {			
-			String buffer;
-			FileSet fileSet = fileSetMap.addFileSetToMap(path, "begin");
-
-			if (fileSet.isFileIsOpen()){
-				while ((buffer = fileSet.readLine()) != null) {
-					if (buffer.length() == 0) {
-						LOGGER.debug("Readed empty line");
-						continue;
-					} else {
-						fileSet.appendLine(buffer);
-						if (fileSet.getBufferList().isEmpty())
-							return;
 	
-						sendEvent(fileSet);
-					}
-				}
-			}
-		}
-		
-		
-		
-		
-	}
-
-	private void fileModified(Path path) throws IOException {
-
-		LOGGER.trace("WatchDir: fileModified");
-
+	private void readLines(FileSet fileSet) throws IOException{
 		String buffer;
-		FileSet fileSet = fileSetMap.getFileSet(path);
-		
-		if (!fileSet.isFileIsOpen())
-			fileSet.open();
-
 		while ((buffer = fileSet.readLine()) != null) {
 			if (buffer.length() == 0) {
 				LOGGER.debug("Readed empty line");
@@ -182,6 +142,31 @@ public class WatchDir {
 				sendEvent(fileSet);
 			}
 		}
+	}
+
+	private void fileCreated(Path path) throws IOException{
+
+		LOGGER.trace("WatchDir: fileCreated");
+
+		if (Files.isDirectory(path, NOFOLLOW_LINKS))
+			registerAll(path);
+		else {	
+			FileSet fileSet = fileSetMap.addFileSetToMap(path, "begin");
+			if (fileSet.isFileIsOpen())
+				readLines(fileSet);		
+		}	
+	}
+
+	private void fileModified(Path path) throws IOException {
+
+		LOGGER.trace("WatchDir: fileModified");
+
+		FileSet fileSet = fileSetMap.getFileSet(path);
+		
+		if (!fileSet.isFileIsOpen())
+			fileSet.open();
+
+		readLines(fileSet);	
 	}
 
 	private void fileDeleted(Path path) throws IOException {
@@ -213,7 +198,7 @@ public class WatchDir {
 		if (fileSet.getBufferList().isEmpty())
 			return;
 
-		StringBuffer sb = fileSet.getAllLines();
+		StringBuilder sb = fileSet.getAllLines();
 		Event event = EventBuilder.withBody(String.valueOf(sb).getBytes(),
 				fileSet.getHeaders());
 		source.getChannelProcessor().processEvent(event);

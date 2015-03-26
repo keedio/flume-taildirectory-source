@@ -31,7 +31,7 @@ public class DirectoryTailSourceCounter extends MonitoredCounterGroup implements
 		scheduler.scheduleAtFixedRate(runnableThroughput, 0, 1,
 				TimeUnit.SECONDS);
 	}
-	
+
 	public void increaseCounterMessageSent() {
 		increment(COUNTER_MESSAGE_SENT);
 	}
@@ -75,11 +75,11 @@ public class DirectoryTailSourceCounter extends MonitoredCounterGroup implements
 
 				if (currentTime > startTime) {
 					averageThroughput = currentMessages
-							/ ((currentTime - startTime));
+							/ (currentTime - startTime);
 				}
 				set(AVERAGE_THROUGHPUT, averageThroughput);
 				previousMessages = currentMessages;
-			}	
+			}
 		}
 	}
 }
