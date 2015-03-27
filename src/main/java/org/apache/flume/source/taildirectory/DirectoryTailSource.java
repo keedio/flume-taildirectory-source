@@ -37,42 +37,21 @@ public class DirectoryTailSource extends AbstractSource implements
 
 	private static final String CONFIG_DIRS = "dirs";
 	private static final String CONFIG_PATH = "path";
-	private static final String UNLOCK_TIME = "unlockFileTime";
-
-	private static final Logger LOGGER = LoggerFactory
-			.getLogger(DirectoryTailSource.class);
+	
+	private static final Logger LOGGER = LoggerFactory.getLogger(DirectoryTailSource.class);
+	
 	private String confDirs;
 	private Set<String> dirs;
 	private Set<WatchDir> watchDirs;
-	private long timeToUnlockFile;
 	private DirectoryTailSourceCounter counter;
+	private Context context;
 
 	@Override
 	public void configure(Context context) {
 		LOGGER.info("Source Configuring..");
-
-		confDirs = context.getString(CONFIG_DIRS).trim();
-		Preconditions.checkState(confDirs != null,
-				"Configuration must be specified directory(ies).");
-
-		String[] confDirArr = confDirs.split(" ");
-		Preconditions.checkState(confDirArr.length > 0, CONFIG_DIRS
-				+ " must be specified at least one.");
-
-		timeToUnlockFile = context.getLong(UNLOCK_TIME, 1L);
-
-		dirs = new HashSet<String>();
-
-		for (int i = 0; i < confDirArr.length; i++) {
-			String path = context.getString(CONFIG_DIRS + "." + confDirArr[i]
-					+ "." + CONFIG_PATH);
-			dirs.add(path);
-			if (path == null) {
-				LOGGER.warn("Configuration is empty : " + CONFIG_DIRS + "."
-						+ confDirArr[i] + "." + CONFIG_PATH);
-				continue;
-			}
-		}
+		
+		this.context = context;
+		loadConfiguration();
 
 		counter = new DirectoryTailSourceCounter("SOURCE.DirectoryTailSource-"
 				+ this.getName());
@@ -87,7 +66,7 @@ public class DirectoryTailSource extends AbstractSource implements
 		try {
 			for (String path : dirs) {
 				WatchDir watchDir = new WatchDir(FileSystems.getDefault()
-						.getPath(path), this, timeToUnlockFile, counter);
+						.getPath(path), this, context, counter);
 				watchDirs.add(watchDir);
 			}
 		} catch (IOException e) {
@@ -106,5 +85,25 @@ public class DirectoryTailSource extends AbstractSource implements
 			watchDir.stop();
 		}
 		super.stop();
+	}
+	
+	private void loadConfiguration(){
+		
+		confDirs = context.getString(CONFIG_DIRS).trim();
+		Preconditions.checkState(confDirs != null, "Configuration must be specified directory(ies).");
+
+		String[] confDirArr = confDirs.split(" ");
+		Preconditions.checkState(confDirArr.length > 0, CONFIG_DIRS	+ " must be specified at least one.");
+		
+		dirs = new HashSet<String>();
+
+		for (int i = 0; i < confDirArr.length; i++) {
+			String path = context.getString(CONFIG_DIRS + "." + confDirArr[i] + "." + CONFIG_PATH);
+			dirs.add(path);
+			if (path == null) {
+				LOGGER.warn("Configuration is empty : " + CONFIG_DIRS + "."	+ confDirArr[i] + "." + CONFIG_PATH);
+				continue;
+			}
+		}
 	}
 }

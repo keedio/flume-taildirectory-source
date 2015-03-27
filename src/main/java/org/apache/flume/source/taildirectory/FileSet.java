@@ -195,4 +195,8 @@ public class FileSet {
 		filePath = path;
 		file = new File(path.toString());
 	}
+	
+	public Path getFileName(){
+		return filePath.getFileName();
+	}
 }
