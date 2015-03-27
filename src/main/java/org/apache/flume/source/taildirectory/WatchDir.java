@@ -13,6 +13,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.flume.Context;
 import org.apache.flume.Event;
 import org.apache.flume.event.EventBuilder;
 import org.apache.flume.source.AbstractSource;
@@ -20,6 +21,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class WatchDir {
+	
+	private static final String UNLOCK_TIME = "unlockFileTime";
+	private static final String FILE_HEADER = "fileHeader";
+	private static final String BASENAME_HEADER = "basenameHeader";
+	private static final String FILE_HEADER_KEY = "fileHeaderKey";
+	private static final String BASENAME_HEADER_KEY = "basenameHeaderKey";
 
 	private final WatchService watcher;
 	private final Map<WatchKey, Path> keys;
@@ -27,6 +34,9 @@ public class WatchDir {
 	private FileSetMap fileSetMap;
 	private Map<String, String> filePathsAndKeys;
 	private long timeToUnlockFile;
+	private DirectoryTailSourceCounter counter;
+	private boolean fileHeader, basenameHeader;
+	private String fileHeaderKey, basenameHeaderKey;
 
 	private static final Logger LOGGER= LoggerFactory
 			.getLogger(WatchDir.class);
@@ -34,17 +44,16 @@ public class WatchDir {
 	private final ScheduledExecutorService scheduler = Executors
 			.newScheduledThreadPool(2);
 
-	private DirectoryTailSourceCounter counter;
-
 	/**
 	 * Creates a WatchService and registers the given directory
 	 */
-	WatchDir(Path dir, AbstractSource source, long timeToUnlockFile,
+	WatchDir(Path dir, AbstractSource source, Context context,
 			DirectoryTailSourceCounter counter) throws IOException {
 
 		LOGGER.trace("WatchDir: WatchDir");
 
-		this.timeToUnlockFile = timeToUnlockFile;
+		loadConfiguration(context);
+	
 		this.counter = counter;
 
 		this.source = source;
@@ -68,6 +77,15 @@ public class WatchDir {
 		scheduler.scheduleAtFixedRate(printThroughput, 0, 5, TimeUnit.SECONDS);
 	}
 	
+	private void loadConfiguration(Context context) {
+		
+		timeToUnlockFile = context.getLong(UNLOCK_TIME, 1L);
+		fileHeader = new Boolean(context.getBoolean(FILE_HEADER, false));
+		fileHeaderKey = new String(context.getString(FILE_HEADER_KEY, "file"));
+		basenameHeader = new Boolean(context.getBoolean(BASENAME_HEADER, false));
+		basenameHeaderKey = new String(context.getString(BASENAME_HEADER_KEY, "basename"));
+	}
+
 	@SuppressWarnings("unchecked")
 	static <T> WatchEvent<T> cast(WatchEvent<?> event) {
 		return (WatchEvent<T>) event;
@@ -199,6 +217,15 @@ public class WatchDir {
 		StringBuilder sb = fileSet.getAllLines();
 		Event event = EventBuilder.withBody(String.valueOf(sb).getBytes(),
 				fileSet.getHeaders());
+		
+		Map<String,String> headers = new HashMap<String, String>();
+		if (fileHeader)
+			headers.put(fileHeaderKey,fileSet.getFilePath().toString());
+		if (basenameHeader)
+			headers.put(basenameHeaderKey, fileSet.getFileName().toString());
+		if (!headers.isEmpty())
+			event.setHeaders(headers);
+		
 		source.getChannelProcessor().processEvent(event);
 
 		counter.increaseCounterMessageSent();
@@ -240,10 +267,10 @@ public class WatchDir {
 						
 						LOGGER.trace("FILE: {}",fileSet.getFilePath());
 						
-						Date expiry = new Date(lastAppendTime);
-						LOGGER.trace("LAST APPEND TIME {}", expiry);
-						expiry = new Date(currentTime);
-						LOGGER.trace("CURRENT TIME {}", currentTime);
+						Date date = new Date(lastAppendTime);
+						LOGGER.trace("LAST APPEND TIME {}", date);
+						date = new Date(currentTime);
+						LOGGER.trace("CURRENT TIME {}", date);
 						
 						LOGGER.debug("Checking file: " + fileSet.getFilePath());
 	
@@ -290,26 +317,29 @@ public class WatchDir {
 					}
 
 					for (WatchEvent<?> event : key.pollEvents()) {
-						Kind<?> kind = event.kind();
-
-						// Context for directory entry event is the file name of
-						// entry
-						WatchEvent<Path> ev = cast(event);
-						Path name = ev.context();
-						Path path = dir.resolve(name);
-
-						// print out event
-						LOGGER.trace(event.kind().name() + ": " + path);
-
-						if (kind == ENTRY_MODIFY) {
-							fileModified(path);
-						} else if (kind == ENTRY_CREATE) {
-							fileCreated(path);				
-						} else if (kind == ENTRY_DELETE) {
-							fileDeleted(path);
-						}
+						try{
+							Kind<?> kind = event.kind();
+	
+							// Context for directory entry event is the file name of
+							// entry
+							WatchEvent<Path> ev = cast(event);
+							Path name = ev.context();
+							Path path = dir.resolve(name);
+	
+							// print out event
+							LOGGER.trace(event.kind().name() + ": " + path);
+	
+							if (kind == ENTRY_MODIFY) {
+								fileModified(path);
+							} else if (kind == ENTRY_CREATE) {
+								fileCreated(path);				
+							} else if (kind == ENTRY_DELETE) {
+								fileDeleted(path);
+							}
+						} catch (IOException x) {
+							LOGGER.error(x.getMessage(), x);
+						}	
 					}
-
 					// reset key and remove from set if directory no longer
 					// accessible
 					boolean valid = key.reset();
@@ -321,10 +351,9 @@ public class WatchDir {
 						}
 					}
 				}
-			} catch (Exception x) {
+			} catch (InterruptedException x) {
 				LOGGER.error(x.getMessage(), x);
 			}
 		}
-
 	}
 }
