@@ -32,6 +32,7 @@ Configuration
 | fileHeaderKey | file | Key of file absolute path header |
 | basenameHeader | false | Include file base name in events header |
 | basenameHeaderKey | basename | Key of file base name header |
+| followLinks | false | Follow symbolic links to directories referenced in monitorized directories |
 
 
 * Example
