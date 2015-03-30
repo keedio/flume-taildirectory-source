@@ -27,6 +27,7 @@ public class WatchDir {
 	private static final String BASENAME_HEADER = "basenameHeader";
 	private static final String FILE_HEADER_KEY = "fileHeaderKey";
 	private static final String BASENAME_HEADER_KEY = "basenameHeaderKey";
+	private static final String FOLLOW_LINKS = "followLinks";
 
 	private final WatchService watcher;
 	private final Map<WatchKey, Path> keys;
@@ -37,6 +38,7 @@ public class WatchDir {
 	private DirectoryTailSourceCounter counter;
 	private boolean fileHeader, basenameHeader;
 	private String fileHeaderKey, basenameHeaderKey;
+	private boolean followLinks;
 
 	private static final Logger LOGGER= LoggerFactory
 			.getLogger(WatchDir.class);
@@ -84,6 +86,7 @@ public class WatchDir {
 		fileHeaderKey = new String(context.getString(FILE_HEADER_KEY, "file"));
 		basenameHeader = new Boolean(context.getBoolean(BASENAME_HEADER, false));
 		basenameHeaderKey = new String(context.getString(BASENAME_HEADER_KEY, "basename"));
+		followLinks = new Boolean(context.getBoolean(FOLLOW_LINKS, false));
 	}
 
 	@SuppressWarnings("unchecked")
@@ -98,8 +101,25 @@ public class WatchDir {
 	private void registerAll(final Path start) throws IOException {
 
 		LOGGER.trace("WatchDir: registerAll");
+		
+		EnumSet<FileVisitOption> opts;
+		
+		if (followLinks)
+			opts = EnumSet.of(FileVisitOption.FOLLOW_LINKS);
+		else
+			opts = EnumSet.noneOf(FileVisitOption.class);
+		
+		Files.walkFileTree(start, opts, Integer.MAX_VALUE, new SimpleFileVisitor<Path>() {
+			@Override
+			public FileVisitResult preVisitDirectory(Path dir,
+					BasicFileAttributes attrs) throws IOException {
+				register(dir);
+				return FileVisitResult.CONTINUE;
+			}
+		});
 
 		// register directory and sub-directories
+		
 		Files.walkFileTree(start, new SimpleFileVisitor<Path>() {
 			@Override
 			public FileVisitResult preVisitDirectory(Path dir,
@@ -136,11 +156,8 @@ public class WatchDir {
 		File folder = dir.toFile();
 
 		for (final File fileEntry : folder.listFiles()) {
-			if (!fileEntry.isDirectory()) {
+			if (!fileEntry.isDirectory())
 				fileSetMap.addFileSetToMap(fileEntry.toPath(), "end");
-			} else {
-				LOGGER.warn("FileEntry found as directory --> TODO: debug this case");
-			}
 		}
 	}
 	
@@ -163,14 +180,25 @@ public class WatchDir {
 	private void fileCreated(Path path) throws IOException{
 
 		LOGGER.trace("WatchDir: fileCreated");
-
-		if (Files.isDirectory(path, NOFOLLOW_LINKS))
-			registerAll(path);
-		else {	
-			FileSet fileSet = fileSetMap.addFileSetToMap(path, "begin");
-			if (fileSet.isFileIsOpen())
-				readLines(fileSet);		
-		}	
+		
+		boolean directory = false;
+		
+		if (followLinks){
+			if (Files.isDirectory(path)){
+				registerAll(path);
+				directory=true;
+			}
+		}else
+			if (Files.isDirectory(path, NOFOLLOW_LINKS)){
+				registerAll(path);
+				directory=true;
+			}
+		
+		if(!directory){
+			FileSet fileSet = fileSetMap.addFileSetToMap(path,"begin");
+			if (fileSet != null && fileSet.isFileIsOpen())
+				readLines(fileSet);
+		}
 	}
 
 	private void fileModified(Path path) throws IOException {
@@ -179,10 +207,12 @@ public class WatchDir {
 
 		FileSet fileSet = fileSetMap.getFileSet(path);
 		
-		if (!fileSet.isFileIsOpen())
-			fileSet.open();
-
-		readLines(fileSet);	
+		if (fileSet != null){
+			if (!fileSet.isFileIsOpen())
+				fileSet.open();
+		
+			readLines(fileSet);
+		}
 	}
 
 	private void fileDeleted(Path path) throws IOException {

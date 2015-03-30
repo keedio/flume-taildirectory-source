@@ -1,6 +1,7 @@
 package org.apache.flume.source.taildirectory;
 
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
@@ -37,6 +38,12 @@ public class FileSetMap extends HashMap<String, FileSet> {
 			throws IOException {
 
 		FileSet fileSet;
+        
+		if (Files.isSymbolicLink(path)){
+			LOGGER.warn("Symbolic links not accepted, ignoring {}",path);
+			return null;
+		}
+		
 		String fileKey = FileKeys.getFileKey(path);
 
 		if (!this.containsKey(fileKey)) {
