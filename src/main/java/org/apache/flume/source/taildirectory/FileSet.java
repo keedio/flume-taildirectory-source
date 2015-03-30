@@ -50,7 +50,7 @@ public class FileSet {
 		this.headers = new HashMap<String, String>();
 		this.lastAppendTime = System.currentTimeMillis();
 		this.filePath = filePath;
-
+		
 		file = new File(filePath.toString());
 
 		if ("end".equals(startFrom)) {
@@ -194,5 +194,9 @@ public class FileSet {
 	public void setFilePath(Path path) {
 		filePath = path;
 		file = new File(path.toString());
+	}
+	
+	public Path getFileName(){
+		return filePath.getFileName();
 	}
 }

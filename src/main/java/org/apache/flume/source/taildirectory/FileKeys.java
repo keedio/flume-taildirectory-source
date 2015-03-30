@@ -21,11 +21,13 @@ public class FileKeys {
 			return path.toString();
 		else
 			try{
-				return Files.readAttributes(path, BasicFileAttributes.class)
-						.fileKey().toString();
+				if (Files.exists(path))
+					return Files.readAttributes(path, BasicFileAttributes.class)
+							.fileKey().toString();
+				else
+					return null;
 			}catch (IOException e){
 				LOGGER.warn(e.getMessage(),e);
-				LOGGER.warn("File {} not found, maby removed/moved",path);
 				return null;
 			}
 	}
