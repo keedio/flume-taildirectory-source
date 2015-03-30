@@ -16,7 +16,7 @@ mvn package
 
 Use
 ===
-Make the directory in flume installation path ```$FLUME_HOME/plugins.d/tail-directory-source/lib``` and copy the file   ```flume-taildirectory-source-0.0.1.jar``` in it.  
+Make the directory in flume installation path ```$FLUME_HOME/plugins.d/tail-directory-source/lib``` and copy the file   ```flume-taildirectory-source-1.1.1.jar``` in it.  
 Edit flume configuration file with the parameters above.
 
 Configuration
@@ -27,21 +27,26 @@ Configuration
 | Type | - | org.apache.flume.source.taildirectory.DirectoryTailSource |
 | dirs | - | NICK of directories, it's such as list of what directories are monitored |
 | dirs.NICK.path | - | Directory path |
-| unlockFileTime | 1 | Delay to check not modified files to unlock the access to them ( in minutes )
+| unlockFileTime | 1 | Delay to check not modified files to unlock the access to them ( in minutes ) |
+| fileHeader | false | Include file absolute path in events header |
+| fileHeaderKey | file | Key of file absolute path header |
+| basenameHeader | false | Include file base name in events header |
+| basenameHeaderKey | basename | Key of file base name header |
+
 
 * Example
 ```
 agent.sources = tailDir
 agent.sources.tailDir.type = org.apache.flume.source.taildirectory.DirectoryTailSource
-agent.sources.tailDir.dirs = tmpDir varLogDir
-agent.sources.tailDir.dirs.tmpDir.path = /tmp
-agent.sources.taildir.dirs.tmpDir.unlockFileTime = 1
-agent.sources.taildir.dirs.varLogDir.path = /var/log
-agent.sources.taildir.dirs.varLogDir.unlockFileTime = 1
+agent.sources.tailDir.dirs = monitDir1 monitDir2
+agent.sources.tailDir.dirs.monitDir1.path = /var/lib/flume/tailDir-1
+agent.sources.tailDir.dirs.monitDir2.path = /var/lib/flume/tailDir-2
+agent.sources.tailDir.dirs.unlockFileTime = 1
+agent.sources.tailDir.basenameHeader = true
+agent.sources.tailDir.basenameHeaderKey = basenameFilename
+agent.sources.tailDir.fileHeader = true
+agent.sources.tailDir.fileHeaderKey = file
+agent.sources.tailDir.followLinks = false
+
+agent.sources.tailDir.channels = memoryChannel
 ```
-
-TO DO:
-======
-
-* Include multi thread posibility to parallelize tasks
-* Test synchronization between threads
