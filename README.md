@@ -27,6 +27,7 @@ Configuration
 | Type | - | org.apache.flume.source.taildirectory.DirectoryTailSource |
 | dirs | - | NICK of directories, it's such as list of what directories are monitored |
 | dirs.NICK.path | - | Directory path |
+| dirs.NICK.filenamePattern | - | Filename pattern |
 | unlockFileTime | 1 | Delay to check not modified files to unlock the access to them ( in minutes ) |
 | fileHeader | false | Include file absolute path in events header |
 | fileHeaderKey | file | Key of file absolute path header |
@@ -41,6 +42,7 @@ agent.sources = tailDir
 agent.sources.tailDir.type = org.apache.flume.source.taildirectory.DirectoryTailSource
 agent.sources.tailDir.dirs = monitDir1 monitDir2
 agent.sources.tailDir.dirs.monitDir1.path = /var/lib/flume/tailDir-1
+agent.sources.tailDir.dirs.monitDir1.filenamePattern = .*.log
 agent.sources.tailDir.dirs.monitDir2.path = /var/lib/flume/tailDir-2
 agent.sources.tailDir.dirs.unlockFileTime = 1
 agent.sources.tailDir.basenameHeader = true
