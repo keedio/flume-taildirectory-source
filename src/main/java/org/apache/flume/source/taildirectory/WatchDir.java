@@ -20,6 +20,8 @@ import org.apache.flume.source.AbstractSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.regex.*;
+
 public class WatchDir {
 	
 	private static final String UNLOCK_TIME = "unlockFileTime";
@@ -39,6 +41,7 @@ public class WatchDir {
 	private boolean fileHeader, basenameHeader;
 	private String fileHeaderKey, basenameHeaderKey;
 	private boolean followLinks;
+	private String filenamePattern;
 
 	private static final Logger LOGGER= LoggerFactory
 			.getLogger(WatchDir.class);
@@ -49,11 +52,12 @@ public class WatchDir {
 	/**
 	 * Creates a WatchService and registers the given directory
 	 */
-	WatchDir(Path dir, AbstractSource source, Context context,
+	WatchDir(Path dir, String filenamePattern, AbstractSource source, Context context,
 			DirectoryTailSourceCounter counter) throws IOException {
 
 		LOGGER.trace("WatchDir: WatchDir");
 
+		this.filenamePattern = filenamePattern;
 		loadConfiguration(context);
 	
 		this.counter = counter;
@@ -156,7 +160,7 @@ public class WatchDir {
 		File folder = dir.toFile();
 
 		for (final File fileEntry : folder.listFiles()) {
-			if (!fileEntry.isDirectory())
+			if (!fileEntry.isDirectory() && (filenamePattern.isEmpty() != Pattern.matches(filenamePattern, fileEntry.getPath())))
 				fileSetMap.addFileSetToMap(fileEntry.toPath(), "end");
 		}
 	}
@@ -194,7 +198,7 @@ public class WatchDir {
 				directory=true;
 			}
 		
-		if(!directory){
+		if(!directory && (filenamePattern.isEmpty() != Pattern.matches(filenamePattern, path.toString()))){
 			FileSet fileSet = fileSetMap.addFileSetToMap(path,"begin");
 			if (fileSet != null && fileSet.isFileIsOpen())
 				readLines(fileSet);
@@ -205,34 +209,38 @@ public class WatchDir {
 
 		LOGGER.trace("WatchDir: fileModified");
 
-		FileSet fileSet = fileSetMap.getFileSet(path);
+		if(filenamePattern.isEmpty() != Pattern.matches(filenamePattern, path.toString())) {
+			FileSet fileSet = fileSetMap.getFileSet(path);
 		
-		if (fileSet != null){
-			if (!fileSet.isFileIsOpen())
-				fileSet.open();
+			if (fileSet != null) {
+				if (!fileSet.isFileIsOpen())
+					fileSet.open();
 		
-			readLines(fileSet);
+				readLines(fileSet);
+			}
 		}
 	}
 
 	private void fileDeleted(Path path) throws IOException {
 		LOGGER.trace("WatchDir: fileDeleted");
 
-		String fileKey = FileKeys.getFileKey(path);
+		if (filenamePattern.isEmpty() != Pattern.matches(filenamePattern, path.toString())) {
+			String fileKey = FileKeys.getFileKey(path);
 		
-		if (fileKey == null){
-			fileKey = filePathsAndKeys.get(path.toString());
-		}
-
-		if (fileKey != null) {
-			FileSet fileSet = fileSetMap.get(fileKey);
-			if (fileSet.isFileIsOpen()){
-				fileSet.clear();
-				fileSet.close();
+			if (fileKey == null) {
+				fileKey = filePathsAndKeys.get(path.toString());
 			}
 
-			if (filePathsAndKeys.containsKey(path.toString())) {
-				filePathsAndKeys.remove(path.toString());
+			if (fileKey != null) {
+				FileSet fileSet = fileSetMap.get(fileKey);
+				if (fileSet.isFileIsOpen()) {
+					fileSet.clear();
+					fileSet.close();
+				}
+
+				if (filePathsAndKeys.containsKey(path.toString())) {
+					filePathsAndKeys.remove(path.toString());
+				}
 			}
 		}
 	}

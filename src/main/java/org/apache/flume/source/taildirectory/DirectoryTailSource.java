@@ -37,11 +37,12 @@ public class DirectoryTailSource extends AbstractSource implements
 
 	private static final String CONFIG_DIRS = "dirs";
 	private static final String CONFIG_PATH = "path";
+	private static final String FILENAME_PATTERN = "filenamePattern";
 	
 	private static final Logger LOGGER = LoggerFactory.getLogger(DirectoryTailSource.class);
 	
 	private String confDirs;
-	private Set<String> dirs;
+	private Set<WatchDirConfig> dirs;
 	private Set<WatchDir> watchDirs;
 	private DirectoryTailSourceCounter counter;
 	private Context context;
@@ -64,9 +65,9 @@ public class DirectoryTailSource extends AbstractSource implements
 		counter.start();
 
 		try {
-			for (String path : dirs) {
-				WatchDir watchDir = new WatchDir(FileSystems.getDefault()
-						.getPath(path), this, context, counter);
+			for (WatchDirConfig dir : dirs) {
+				WatchDir watchDir = new WatchDir(FileSystems.getDefault().getPath(dir.getDir())
+						,dir.getFilenamePattern(), this, context, counter);
 				watchDirs.add(watchDir);
 			}
 		} catch (IOException e) {
@@ -95,11 +96,15 @@ public class DirectoryTailSource extends AbstractSource implements
 		String[] confDirArr = confDirs.split(" ");
 		Preconditions.checkState(confDirArr.length > 0, CONFIG_DIRS	+ " must be specified at least one.");
 		
-		dirs = new HashSet<String>();
-
+		dirs = new HashSet<WatchDirConfig>();
+		
 		for (int i = 0; i < confDirArr.length; i++) {
 			String path = context.getString(CONFIG_DIRS + "." + confDirArr[i] + "." + CONFIG_PATH);
-			dirs.add(path);
+			String filenamePattern = context.getString(CONFIG_DIRS + "." + confDirArr[i] + "." + FILENAME_PATTERN);
+			
+			WatchDirConfig dc = new WatchDirConfig(path, filenamePattern);
+			dirs.add(dc);
+			
 			if (path == null) {
 				LOGGER.warn("Configuration is empty : " + CONFIG_DIRS + "."	+ confDirArr[i] + "." + CONFIG_PATH);
 				continue;
