@@ -12,3 +12,6 @@ dependency-reduced-pom.xml
 .idea/
 **/*.iml
 
+# folder icon
+desktop.ini
+folder.ico
